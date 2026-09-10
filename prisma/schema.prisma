@@ -1,0 +1,444 @@
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes", "postgresqlExtensions", "views"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [postgis]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model app_user {
+  id                 BigInt            @id @default(autoincrement())
+  username           String            @unique
+  password_hash      String
+  full_name          String?
+  position           String?
+  email              String?
+  tel                String?
+  org_code           String
+  role               String
+  scope_area         String?
+  is_active          Boolean           @default(true)
+  last_login_at      DateTime?         @db.Timestamptz(6)
+  login_count        Int               @default(0)
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  org                c_org             @relation(fields: [org_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  adm_area           c_area?           @relation(fields: [scope_area], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  accepted_cases     case_acceptance[] @relation("case_acceptance_accepted_byToapp_user")
+  released_cases     case_acceptance[] @relation("case_acceptance_released_byToapp_user")
+  created_activities case_activity[]   @relation("case_activity_created_byToapp_user")
+  updated_activities case_activity[]   @relation("case_activity_updated_byToapp_user")
+  approved_documents case_document[]   @relation("case_document_approved_byToapp_user")
+  created_documents  case_document[]   @relation("case_document_created_byToapp_user")
+  updated_documents  case_document[]   @relation("case_document_updated_byToapp_user")
+  created_cases      case_report[]     @relation("case_report_created_byToapp_user")
+  deleted_cases      case_report[]     @relation("case_report_deleted_byToapp_user")
+  updated_cases      case_report[]     @relation("case_report_updated_byToapp_user")
+  case_view_log      case_view_log[]
+
+  @@index([org_code], map: "app_user_org_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model case_acceptance {
+  id                    BigInt            @id @default(autoincrement())
+  case_id               BigInt            @unique(map: "case_accept_one_active", where: raw("(status = 'active'::text)"))
+  org_code              String
+  date_accept           DateTime          @default(dbgenerated("((now() AT TIME ZONE 'Asia/Bangkok'::text))::date")) @db.Date
+  time_accept           DateTime?         @default(dbgenerated("((now() AT TIME ZONE 'Asia/Bangkok'::text))::time without time zone")) @db.Time(6)
+  accepted_by           BigInt
+  status                String            @default("active")
+  released_at           DateTime?         @db.Timestamptz(6)
+  released_by           BigInt?
+  note                  String?
+  transferred_from      BigInt?
+  accepted_by_user      app_user          @relation("case_acceptance_accepted_byToapp_user", fields: [accepted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  case_report           case_report       @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  org                   c_org             @relation(fields: [org_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  released_by_user      app_user?         @relation("case_acceptance_released_byToapp_user", fields: [released_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  case_acceptance       case_acceptance?  @relation("case_acceptanceTocase_acceptance", fields: [transferred_from], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  other_case_acceptance case_acceptance[] @relation("case_acceptanceTocase_acceptance")
+
+  @@index([case_id], map: "case_accept_case_idx")
+  @@index([org_code, status], map: "case_accept_org_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model case_activity {
+  id              BigInt           @id @default(autoincrement())
+  case_id         BigInt
+  date_act        DateTime         @db.Date
+  time_act        DateTime?        @db.Time(6)
+  activity_code   String?
+  activity_name   String?
+  performer       String?
+  performer_org   String?
+  note            String?
+  created_at      DateTime         @default(now()) @db.Timestamptz(6)
+  created_by      BigInt?
+  updated_at      DateTime         @default(now()) @db.Timestamptz(6)
+  updated_by      BigInt?
+  activity_type   c_activity_type? @relation(fields: [activity_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  case_report     case_report      @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  created_by_user app_user?        @relation("case_activity_created_byToapp_user", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  org             c_org?           @relation(fields: [performer_org], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  updated_by_user app_user?        @relation("case_activity_updated_byToapp_user", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  case_document   case_document[]
+
+  @@index([case_id, date_act, time_act], map: "act_case_idx")
+  @@index([activity_code, date_act], map: "act_type_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model case_document {
+  id               BigInt           @id @default(autoincrement())
+  case_id          BigInt
+  activity_id      BigInt?
+  form_template_id BigInt?
+  data             Json?
+  file_path        String?
+  file_name        String?
+  mime_type        String?
+  file_size        BigInt?
+  status           String           @default("draft")
+  submitted_at     DateTime?        @db.Timestamptz(6)
+  approved_at      DateTime?        @db.Timestamptz(6)
+  approved_by      BigInt?
+  created_at       DateTime         @default(now()) @db.Timestamptz(6)
+  created_by       BigInt?
+  updated_at       DateTime         @default(now()) @db.Timestamptz(6)
+  updated_by       BigInt?
+  case_activity    case_activity?   @relation(fields: [activity_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  approved_by_user app_user?        @relation("case_document_approved_byToapp_user", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  case_report      case_report      @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  created_by_user  app_user?        @relation("case_document_created_byToapp_user", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  form_template    c_form_template? @relation(fields: [form_template_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updated_by_user  app_user?        @relation("case_document_updated_byToapp_user", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([activity_id], map: "doc_act_idx", where: raw("(activity_id IS NOT NULL)"))
+  @@index([case_id], map: "doc_case_idx")
+  @@index([data], map: "doc_data_idx", type: Gin)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model case_report {
+  id                BigInt                   @id @default(autoincrement())
+  case_no           String?                  @unique @default(dbgenerated("((('65-'::text || to_char((now() AT TIME ZONE 'Asia/Bangkok'::text), 'YYYY'::text)) || '-'::text) || lpad((nextval('case_no_seq'::regclass))::text, 6, '0'::text))"))
+  disease_code      String
+  status            String                   @default("reported")
+  case_class        String?
+  cid               String?
+  passport          String?
+  hn                String?
+  pname             String?
+  fname             String?
+  lname             String?
+  gender            String?
+  birth_date        DateTime?                @db.Date
+  age_y             Int?                     @db.SmallInt
+  age_m             Int?                     @db.SmallInt
+  nationality       String?
+  occupation_code   String?
+  area_code         String?
+  addr_no           String?
+  moo               String?
+  street            String?
+  place_name        String?
+  tel               String?
+  geom              Unsupported("geometry")?
+  date_onset        DateTime                 @db.Date
+  date_visit        DateTime?                @db.Date
+  date_dx           DateTime?                @db.Date
+  time_dx           DateTime?                @db.Time(6)
+  date_admit        DateTime?                @db.Date
+  date_discharge    DateTime?                @db.Date
+  discharge_type    String?
+  date_death        DateTime?                @db.Date
+  patient_type      String?
+  symptom           String?
+  lab_result        Json                     @default("{}")
+  detail            Json                     @default("{}")
+  report_org_code   String
+  reporter_name     String?
+  reporter_position String?
+  reporter_tel      String?
+  date_report       DateTime                 @default(dbgenerated("((now() AT TIME ZONE 'Asia/Bangkok'::text))::date")) @db.Date
+  time_report       DateTime?                @default(dbgenerated("((now() AT TIME ZONE 'Asia/Bangkok'::text))::time without time zone")) @db.Time(6)
+  created_at        DateTime                 @default(now()) @db.Timestamptz(6)
+  created_by        BigInt?
+  updated_at        DateTime                 @default(now()) @db.Timestamptz(6)
+  updated_by        BigInt?
+  deleted_at        DateTime?                @db.Timestamptz(6)
+  deleted_by        BigInt?
+  delete_reason     String?
+  case_acceptance   case_acceptance[]
+  case_activity     case_activity[]
+  case_document     case_document[]
+  adm_area          c_area?                  @relation(fields: [area_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user   app_user?                @relation("case_report_created_byToapp_user", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  deleted_by_user   app_user?                @relation("case_report_deleted_byToapp_user", fields: [deleted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  disease           c_disease                @relation(fields: [disease_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  occupation        c_occupation?            @relation(fields: [occupation_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  org               c_org                    @relation(fields: [report_org_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  updated_by_user   app_user?                @relation("case_report_updated_byToapp_user", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([area_code], map: "case_area_idx", where: raw("(deleted_at IS NULL)"))
+  @@index([cid], map: "case_cid_idx", where: raw("(cid IS NOT NULL)"))
+  @@index([detail], map: "case_detail_idx", type: Gin)
+  @@index([disease_code, date_onset], map: "case_disease_onset_idx", where: raw("(deleted_at IS NULL)"))
+  @@index([geom], map: "case_geom_idx", type: Gist)
+  @@index([report_org_code], map: "case_report_org_idx")
+  @@index([status], map: "case_status_idx", where: raw("(deleted_at IS NULL)"))
+}
+
+model case_view_log {
+  id         BigInt   @id @default(autoincrement())
+  case_id    BigInt
+  user_id    BigInt
+  viewed_at  DateTime @default(now()) @db.Timestamptz(6)
+  ip         String?  @db.Inet
+  user_agent String?
+  app_user   app_user @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([case_id], map: "viewlog_case_idx")
+  @@index([user_id, viewed_at], map: "viewlog_user_idx")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model spatial_ref_sys {
+  srid      Int     @id
+  auth_name String? @db.VarChar(256)
+  auth_srid Int?
+  srtext    String? @db.VarChar(2048)
+  proj4text String? @db.VarChar(2048)
+}
+
+model c_activity_type {
+  code          String          @id
+  name          String
+  transmission  String?
+  sort_order    Int?
+  case_activity case_activity[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model c_area {
+  code         String                   @id
+  level        Int                      @db.SmallInt
+  name         String
+  parent_code  String?
+  population   Int?
+  geom         Unsupported("geometry")?
+  app_user     app_user[]
+  c_area       c_area?                  @relation("c_areaToc_area", fields: [parent_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  other_c_area c_area[]                 @relation("c_areaToc_area")
+  c_org        c_org[]
+  c_org_area   c_org_area[]
+  case_report  case_report[]
+
+  @@index([geom], type: Gist)
+  @@index([parent_code], map: "c_area_parent_idx")
+}
+
+model c_disease {
+  code                     String            @id
+  name_th                  String
+  name_en                  String?
+  icd10                    String[]
+  disease_group            String?
+  transmission             String?
+  investigate_within_hours Int?
+  control_radius_m         Int?
+  incubation_min_days      Int?
+  incubation_max_days      Int?
+  is_active                Boolean           @default(true)
+  c_form_template          c_form_template[]
+  case_report              case_report[]
+}
+
+model c_form_template {
+  id            BigInt          @id @default(autoincrement())
+  code          String
+  version       Int             @default(1)
+  name          String
+  disease_code  String?
+  schema        Json
+  is_active     Boolean         @default(true)
+  c_disease     c_disease?      @relation(fields: [disease_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  case_document case_document[]
+
+  @@unique([code, version])
+}
+
+model c_occupation {
+  code        String        @id
+  name        String
+  case_report case_report[]
+}
+
+model c_org {
+  code            String                   @id
+  name            String
+  org_type        String?
+  area_code       String?
+  parent_code     String?
+  is_active       Boolean                  @default(true)
+  geom            Unsupported("geometry")?
+  app_user        app_user[]
+  c_area          c_area?                  @relation(fields: [area_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  c_org           c_org?                   @relation("c_orgToc_org", fields: [parent_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  other_c_org     c_org[]                  @relation("c_orgToc_org")
+  c_org_area      c_org_area[]
+  case_acceptance case_acceptance[]
+  case_activity   case_activity[]
+  case_report     case_report[]
+
+  @@index([area_code], map: "org_area_code_idx")
+  @@index([parent_code], map: "org_parent_idx")
+}
+
+model c_org_area {
+  org_code  String
+  area_code String
+  c_area    c_area @relation(fields: [area_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  c_org     c_org  @relation(fields: [org_code], references: [code], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([org_code, area_code])
+  @@index([area_code], map: "org_area_area_idx")
+}
+
+view geography_columns {
+  f_table_catalog    Unsupported("name")?
+  f_table_schema     Unsupported("name")?
+  f_table_name       Unsupported("name")?
+  f_geography_column Unsupported("name")?
+  coord_dimension    Int?
+  srid               Int?
+  type               String?
+}
+
+view geometry_columns {
+  f_table_catalog   String?              @db.VarChar(256)
+  f_table_schema    Unsupported("name")?
+  f_table_name      Unsupported("name")?
+  f_geometry_column Unsupported("name")?
+  coord_dimension   Int?
+  srid              Int?
+  type              String?              @db.VarChar(30)
+}
+
+view v_case_status {
+  id                   BigInt?
+  case_no              String?
+  disease_code         String?
+  status               String?
+  date_onset           DateTime? @db.Date
+  date_report          DateTime? @db.Date
+  time_report          DateTime? @db.Time(6)
+  area_code            String?
+  report_org_code      String?
+  owner_org_code       String?
+  date_accept          DateTime? @db.Date
+  time_accept          DateTime? @db.Time(6)
+  first_activity_at    DateTime? @db.Timestamptz(6)
+  activity_count       BigInt?
+  form_count           BigInt?
+  investigated_in_time Boolean?
+}
+
+view v_case_activity {
+  case_id       BigInt?
+  seq           Int?
+  activity_id   BigInt?
+  date_act      DateTime? @db.Date
+  time_act      DateTime? @db.Time(6)
+  time_act_txt  String?
+  activity_at   DateTime? @db.Timestamptz(6)
+  activity_code String?
+  activity_name String?
+  documents     Json?
+  photos        Json?
+  performer     String?
+  performer_org String?
+  note          String?
+}
+
+view v_case_inbox {
+  org_code           String?
+  id                 BigInt?
+  case_no            String?
+  disease_code       String?
+  status             String?
+  pname              String?
+  fname              String?
+  lname              String?
+  gender             String?
+  age_y              Int?      @db.SmallInt
+  area_code          String?
+  addr_no            String?
+  moo                String?
+  lat                Float?
+  lon                Float?
+  date_onset         DateTime? @db.Date
+  date_visit         DateTime? @db.Date
+  date_report        DateTime? @db.Date
+  time_report        DateTime? @db.Time(6)
+  report_org_code    String?
+  investigate_due_at DateTime? @db.Timestamptz(6)
+}
+
+view v_case_list {
+  id                BigInt?
+  case_no           String?
+  report_org_code   String?
+  report_org_name   String?
+  date_dx           DateTime? @db.Date
+  time_dx           DateTime? @db.Time(6)
+  time_dx_txt       String?
+  date_visit        DateTime? @db.Date
+  date_onset        DateTime? @db.Date
+  date_report       DateTime? @db.Date
+  time_report       DateTime? @db.Time(6)
+  time_report_txt   String?
+  patient_name      String?
+  patient_sub       String?
+  gender            String?
+  age_y             Int?      @db.SmallInt
+  age_m             Int?      @db.SmallInt
+  amp_code          String?
+  amp_name          String?
+  tmb_code          String?
+  tmb_name          String?
+  moo               String?
+  addr_no           String?
+  disease_code      String?
+  disease_name      String?
+  date_accept       DateTime? @db.Date
+  time_accept       DateTime? @db.Time(6)
+  time_accept_txt   String?
+  accepted_org_code String?
+  accepted_org_name String?
+  accepted_by_name  String?
+  status            String?
+  area_code         String?
+}
+
+/// materialized view — prisma db pull มองไม่เห็น postpull.mjs เติมกลับให้
+/// REFRESH MATERIALIZED VIEW CONCURRENTLY mv_case_daily;
+view mv_case_daily {
+  disease_code String
+  date_onset   DateTime @db.Date
+  prov_code    String?
+  amp_code     String?
+  tmb_code     String?
+  moo_code     String
+  cases        BigInt
+  deaths       BigInt
+  controlled   BigInt
+  cases_child  BigInt
+
+  @@unique([disease_code, date_onset, moo_code])
+}

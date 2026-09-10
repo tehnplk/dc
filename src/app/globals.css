@@ -1,26 +1,126 @@
 @import "tailwindcss";
 
+/* ปิด transition ตอนสลับธีม ไม่งั้นทั้งหน้าค่อย ๆ เปลี่ยนสีดูเลอะ */
+:root.theme-switching *, :root.theme-switching *::before, :root.theme-switching *::after {
+  transition: none !important;
+}
+
+/* Flat design: ไม่มี shadow ไม่มี gradient, สีทึบ 4-6 สี, radius 2-4px, transition 150-200ms */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;   /* คุม scrollbar / คอนโทรลของเบราว์เซอร์ให้ตรงธีม */
+  --bg: #f2f8f6;
+  --surface: #ffffff;
+  --surface-2: #e7f4f0;
+  --line: #d2e8e1;
+  --fg: #10261f;
+  --fg-muted: #566d66;
+
+  /* สีแบรนด์จากที่เลือกมา ใช้เป็นบล็อกสีทึบเท่านั้น (บนขาวได้แค่ 1.7:1) */
+  --brand: #38e3be;
+  --on-brand: #05312a;
+
+  /* เฉดเข้มโทนเดียวกัน สำหรับตัวหนังสือ/ไอคอน/เส้น ให้ผ่าน AA */
+  --primary: #0e7a66;
+  --primary-hover: #0a5f50;
+  --primary-soft: #d5f8ef;
+  --on-primary: #ffffff;
+
+  --warn: #92400e;           /* รอรับเคส */
+  --warn-soft: #fef3c7;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* ธีมมืด 3 ทาง: ตามเครื่อง (ไม่มี data-theme) / บังคับสว่าง / บังคับมืด
+   :not([data-theme="light"]) กันไม่ให้ค่าตามเครื่องทับตอนผู้ใช้เลือกสว่างเอง */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  :root:not([data-theme="light"]) {
+    --bg: #071310;
+    --surface: #0d1c18;
+    --surface-2: #13261f;
+    --line: #1e3830;
+    --fg: #e4f2ec;
+    --fg-muted: #8fa9a0;
+
+    color-scheme: dark;
+    /* ธีมมืดกลับด้าน: บล็อกเป็นเขียวเข้ม ตัวอักษร/ไอคอนเป็นมิ้นต์
+       ถ้าใช้ #38e3be เป็นพื้นเหมือนธีมสว่าง บล็อกใหญ่จะสว่างจัดจนแสบตา */
+    --brand: #123c33;
+    --on-brand: #5eead4;
+
+    --primary: #5eead4;      /* บนพื้นเข้ม กลับด้านให้สว่างขึ้น ไม่งั้นคอนทราสต์ตก */
+    --primary-hover: #99f6e4;
+    --primary-soft: #0f352d;
+    --on-primary: #05312a;
+
+    --warn: #fcd34d;
+    --warn-soft: #3a2c07;
+    --danger: #fca5a5;
+    --danger-soft: #3b1414;
   }
 }
 
+:root[data-theme="dark"] {
+    --bg: #071310;
+    --surface: #0d1c18;
+    --surface-2: #13261f;
+    --line: #1e3830;
+    --fg: #e4f2ec;
+    --fg-muted: #8fa9a0;
+
+    color-scheme: dark;
+    /* ธีมมืดกลับด้าน: บล็อกเป็นเขียวเข้ม ตัวอักษร/ไอคอนเป็นมิ้นต์
+       ถ้าใช้ #38e3be เป็นพื้นเหมือนธีมสว่าง บล็อกใหญ่จะสว่างจัดจนแสบตา */
+    --brand: #123c33;
+    --on-brand: #5eead4;
+
+    --primary: #5eead4;      /* บนพื้นเข้ม กลับด้านให้สว่างขึ้น ไม่งั้นคอนทราสต์ตก */
+    --primary-hover: #99f6e4;
+    --primary-soft: #0f352d;
+    --on-primary: #05312a;
+
+    --warn: #fcd34d;
+    --warn-soft: #3a2c07;
+    --danger: #fca5a5;
+    --danger-soft: #3b1414;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-brand: var(--brand);
+  --color-on-brand: var(--on-brand);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-on-primary: var(--on-primary);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --font-sans: var(--font-thai), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-mono-thai), ui-monospace, monospace;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* โฟกัสต้องมองเห็นเสมอ ห้ามซ่อน outline */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

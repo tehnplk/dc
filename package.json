@@ -6,9 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:reset": "docker exec dc-postgis psql -U dc -d dc -q -c \"DROP SCHEMA public CASCADE; CREATE SCHEMA public;\" && docker exec dc-postgis psql -U dc -d dc -v ON_ERROR_STOP=1 -q -f /db/schema.sql",
+    "db:test": "npm run db:reset && docker exec dc-postgis psql -U dc -d dc -v ON_ERROR_STOP=1 -q -f /db/smoke_test.sql",
+    "db:pull": "prisma db pull && node prisma/postpull.mjs && prisma format && prisma generate",
+    "db:check": "tsx prisma/check.mts",
+    "db:seed": "docker exec dc-postgis psql -U dc -d dc -v ON_ERROR_STOP=1 -q -f /db/seed_demo.sql",
+    "db:import": "node db/import_legacy.mjs"
   },
   "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "lucide-react": "^1.44.0",
     "next": "16.3.4",
     "react": "19.2.8",
     "react-dom": "19.2.8"
@@ -19,9 +28,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
+    "prisma": "^7.10.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5"
   }
 }

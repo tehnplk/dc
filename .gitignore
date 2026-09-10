@@ -32,6 +32,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +40,20 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+/src/generated/prisma
+
+# playwright-cli (snapshot/screenshot/console ของการเทส)
+/.playwright-cli/
+
+# ไฟล์ที่ผู้ใช้อัปโหลด — เก็บเฉพาะไฟล์ตัวอย่างที่ seed_demo.sql อ้างถึง
+/public/uploads/*
+!/public/uploads/2026/
+/public/uploads/2026/*
+!/public/uploads/2026/09/
+/public/uploads/2026/09/*
+!/public/uploads/2026/09/spray1*
+
+# ดัมป์ฐานข้อมูลระบบเดิม (8 MB ใช้ตอนนำเข้าครั้งเดียว)
+/legacy/
