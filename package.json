@@ -13,7 +13,8 @@
     "db:check": "tsx prisma/check.mts",
     "db:seed": "docker exec dc-postgis psql -U dc -d dc -v ON_ERROR_STOP=1 -q -f /db/seed_demo.sql",
     "db:seed:cases": "docker exec dc-postgis psql -U dc -d dc -v ON_ERROR_STOP=1 -q -f /db/seed_cases.sql",
-    "db:import": "node db/import_legacy.mjs"
+    "db:import": "node db/import_legacy.mjs",
+    "test": "tsx --test src/**/*.test.mts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
