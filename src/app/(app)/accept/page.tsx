@@ -27,7 +27,7 @@ export default async function Page({ searchParams }: PageProps<'/accept'>) {
       take: PAGE_SIZE,
     }),
     prisma.v_case_list.count({ where }),
-    // เคสที่ตกในหมู่บ้านที่หน่วยงานรับผิดชอบ (c_org_area) และยังไม่มีใครกดรับ
+    // เคสที่ตกในหมู่บ้านที่หน่วยงานรับผิดชอบ (hos_village) และยังไม่มีใครกดรับ
     prisma.v_case_inbox.count({ where: { org_code: me.org_code } }),
   ])
 
@@ -58,8 +58,9 @@ export default async function Page({ searchParams }: PageProps<'/accept'>) {
         empty="หน่วยงานยังไม่ได้รับเคส"
         unit={false}
         addr
-        canAdd
-        canRelease
+        canAdd={!me.readonly}
+        canEdit={!me.readonly && me.role === 'hospital'}
+        canRelease={!me.readonly}
         canAccept={false}
         performer={me.full_name}
         page={page}

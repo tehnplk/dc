@@ -10,7 +10,8 @@ export function HisConnectButton() {
   const [state, setState] = useState<'idle' | 'checking' | 'ok' | 'fail'>('idle')
 
   useEffect(() => {
-    if (state === 'ok' || state === 'fail') dlg.current?.showModal()
+    // กัน InvalidStateError กรณี state สลับ ok<->fail ทั้งที่กล่องยังเปิดอยู่
+    if ((state === 'ok' || state === 'fail') && !dlg.current?.open) dlg.current?.showModal()
   }, [state])
 
   const check = async () => {

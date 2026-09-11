@@ -28,7 +28,7 @@ FROM
       case_report c
       JOIN c_disease d ON ((d.code = c.disease_code))
     )
-    JOIN c_org_area oa ON ((oa.area_code = c.area_code))
+    JOIN hos_village oa ON ((oa.area_code = c.area_code))
   )
 WHERE
   (

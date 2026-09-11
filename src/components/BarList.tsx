@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback } from 'react'
+import type { TooltipItem } from 'chart.js'
 import { Chart } from './Chart'
 
 type Row = { label: string; value: number; extra: number | null }
@@ -24,7 +25,7 @@ export function BarList({ title, rows, unit, note }: {
           tooltip: {
             callbacks: {
               // อัตราต่อแสนไม่มีที่ลงในกราฟแท่ง เอามาไว้ใน tooltip แทน
-              label: (i: { parsed: { x: number }; dataIndex: number }) => {
+              label: (i: TooltipItem<'bar'>) => {
                 const e = rows[i.dataIndex].extra
                 return ` ${i.parsed.x} ${unit}${e !== null ? ` · ${e} ต่อแสน ปชก.` : ''}`
               },

@@ -3,10 +3,11 @@ import { ActivityModal } from './ActivityModal'
 import { AcceptButton } from './AcceptButton'
 import { Pagination } from './Pagination'
 import { ReleaseButton } from './ReleaseButton'
-import type { v_case_list } from '@/generated/prisma/models'
+// ชนิดของแถวในวิว: prisma ตั้งชื่อว่า <model>Model ไม่ใช่ชื่อวิวเปล่า ๆ
+import type { v_case_listModel as v_case_list } from '@/generated/prisma/models/v_case_list'
 import { PAGE_SIZE } from '@/lib/ui'
 
-const th = 'px-3 py-2 text-left text-sm font-medium whitespace-nowrap'  // ใหญ่กว่าเซลล์ 2px
+const th = 'px-3 py-2 text-left font-medium whitespace-nowrap'   // ขนาดมาจาก [data-grid] th ใน globals.css
 const td = 'px-3 py-2 align-top whitespace-nowrap'
 const num = `${td} font-mono tabular-nums`
 
@@ -17,20 +18,28 @@ function DateTime({ date, time }: { date: Date | null; time: string | null }) {
     <>
       {/* วันที่ใช้ sans: mono ทำให้จุดของ "ก.ย." กินเต็มช่อง 1 ตัวอักษร ดูเหมือนเว้น 2 ที่ */}
       <div className="font-sans tabular-nums">{d(date)}</div>
-      {time && <div className="text-[11px] text-fg-muted">{time}</div>}
+      {time && <div className="sub text-fg-muted">{time}</div>}
     </>
   )
 }
 
 // from = คอลัมน์ "จาก" ทะเบียนแจ้งไม่ต้องมี เพราะเป็นหน่วยงานตัวเองทุกแถวอยู่แล้ว
 // canAdd = หน้านั้นให้บันทึกกิจกรรมได้ (ทะเบียนรับ) ไม่ส่ง = ดูได้อย่างเดียว
-export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd, canAccept = true, canRelease, performer = null, page, total }:
-  { cases: v_case_list[]; empty: string; from?: boolean; unit?: boolean; addr?: boolean; canAdd?: boolean; canAccept?: boolean; canRelease?: boolean; performer?: string | null; page?: number; total?: number }) {
+export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd, canEdit, addAmp,
+                            canAccept = true, canRelease, performer = null, page, total }:
+  { cases: v_case_list[]; empty: string; from?: boolean; unit?: boolean; addr?: boolean
+    canAdd?: boolean
+    /** แก้/ลบกิจกรรมได้ (ทะเบียนรับของหน่วยบริการ — เคสในนี้คือเคสที่ตัวเองรับไว้) */
+    canEdit?: boolean
+    /** จำกัดปุ่มเพิ่มกิจกรรมไว้เฉพาะเคสที่รหัสพื้นที่ขึ้นต้นด้วยค่านี้ (ใช้กับ role district) */
+    addAmp?: string | null
+    canAccept?: boolean; canRelease?: boolean; performer?: string | null
+    page?: number; total?: number }) {
   return (
     <>
     {/* ตารางกว้าง ต้องเลื่อนในกล่องตัวเอง ไม่ใช่ดันทั้งหน้าให้เลื่อนแนวนอน */}
     <div className="overflow-x-auto rounded-sm border border-line bg-surface">
-      <table className="w-full border-collapse text-xs">
+      <table data-grid className="w-full border-collapse">
         {/* หัวตารางใช้สีแบรนด์ทึบ ให้ตัดกับแถบสลับสีที่เป็น surface-2 จาง ๆ */}
         <thead className="bg-brand text-on-brand">
           <tr className="border-b border-line">
@@ -53,7 +62,7 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
         <tbody>
           {cases.length === 0 && (
             <tr>
-              <td colSpan={10 + (from ? 1 : 0) + (unit ? 1 : 0) + (addr ? 1 : 0) + (canRelease ? 1 : 0)} className="px-3 py-10 text-center text-xs text-fg-muted">{empty}</td>
+              <td colSpan={10 + (from ? 1 : 0) + (unit ? 1 : 0) + (addr ? 1 : 0) + (canRelease ? 1 : 0)} className="px-3 py-10 text-center text-fg-muted">{empty}</td>
             </tr>
           )}
           {/* แถบสลับสี: อ่านข้ามคอลัมน์ไม่หลุดบรรทัด — hover ใช้คนละสีจะได้ไม่จมไปกับแถบ */}
@@ -66,14 +75,14 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
               <td className={num}><DateTime date={c.date_report} time={c.time_report_txt} /></td>
               <td className={td}>
                 <div className="font-medium">{c.patient_name ?? '—'}</div>
-                {c.patient_sub && <div className="text-[11px] text-fg-muted">{c.patient_sub}</div>}
+                {c.patient_sub && <div className="sub text-fg-muted">{c.patient_sub}</div>}
               </td>
               <td className={td}>{c.amp_name ?? '—'}</td>
               <td className={td}>{c.tmb_name ?? '—'}</td>
               <td className={`${num} text-right`}>{c.moo ?? '—'}</td>
               {addr && <td className={num}>{c.addr_no ?? '—'}</td>}
               <td className={td}>
-                <span className="rounded-sm bg-primary-soft px-1.5 py-0.5 text-[11px] font-medium text-primary">
+                <span className="rounded-sm bg-primary-soft px-1.5 py-0.5 sub font-medium text-primary">
                   {c.disease_name}
                 </span>
               </td>
@@ -87,7 +96,7 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
                       patient={c.patient_name}
                       place={[c.tmb_name, c.amp_name].filter(Boolean).join(' · ') || null}
                     />
-                  : <span className="rounded-sm bg-warn-soft px-1.5 py-0.5 font-sans text-[11px] font-medium text-warn">
+                  : <span className="rounded-sm bg-warn-soft px-1.5 py-0.5 font-sans sub font-medium text-warn">
                       รอรับเคส
                     </span>}
               </td>
@@ -95,7 +104,7 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
                 <td className={td}>
                   <div>{c.accepted_org_name ?? '—'}</div>
                   {c.accepted_by_name && (
-                    <div className="text-[11px] text-fg-muted">{c.accepted_by_name}</div>
+                    <div className="sub text-fg-muted">{c.accepted_by_name}</div>
                   )}
                 </td>
               )}
@@ -107,7 +116,8 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
                       caseId={String(c.id)}
                       caseNo={c.case_no}
                       patient={c.patient_name}
-                      canAdd={canAdd}
+                      canAdd={canAdd && (!addAmp || (c.area_code ?? '').startsWith(addAmp))}
+                      canEdit={canEdit}
                       performer={performer}
                     />
                   </div>

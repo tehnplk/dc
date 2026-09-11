@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Thai, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { themeInitScript } from "@/lib/theme";
+import { uiInitScript } from "@/lib/theme";
 
 // Geist ไม่มีสระ/วรรณยุกต์ไทย เบราว์เซอร์จะ fallback ไปฟอนต์ระบบซึ่งไม่เหมือนกันในแต่ละเครื่อง
 const thai = IBM_Plex_Sans_Thai({
@@ -35,17 +33,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         {/* ต้องรันก่อน paint ไม่งั้นจะเห็นธีมสว่างวาบก่อนสลับเป็นมืด */}
-        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <script dangerouslySetInnerHTML={{ __html: uiInitScript }} />
       </head>
       <body className="flex min-h-full font-sans">
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          {/* h-14 เท่าแถบหัว sidebar เพื่อให้เส้นขอบล่างตรงกันพอดี */}
-          <header className="flex h-14 shrink-0 items-center justify-end border-b border-line bg-surface px-4">
-            <ThemeToggle />
-          </header>
-          {children}
-        </div>
+        {children}
       </body>
     </html>
   );

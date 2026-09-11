@@ -66,7 +66,7 @@ INSERT INTO case_acceptance (case_id, org_code, accepted_by, date_accept, time_a
 SELECT c.id, oa.org_code, 2, c.date_report + 1, time '08:20'
 FROM case_report c
 JOIN LATERAL (
-  SELECT org_code FROM c_org_area WHERE area_code = c.area_code ORDER BY org_code LIMIT 1
+  SELECT org_code FROM hos_village WHERE area_code = c.area_code ORDER BY org_code LIMIT 1
 ) oa ON true
 WHERE c.id % 3 <> 0
   AND NOT EXISTS (SELECT 1 FROM case_acceptance a WHERE a.case_id = c.id AND a.status = 'active');

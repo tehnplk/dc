@@ -3,15 +3,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { FileText, Plus, X } from 'lucide-react'
 import { fmtDate } from '@/lib/datetime'
-import { getCase, type Activity, type CaseHead } from '@/app/patients/actions'
+import { getCase, type Activity, type CaseHead } from '@/app/(app)/patients/actions'
 import { FileViewer } from './FileViewer'
 import { AddActivityModal } from './AddActivityModal'
+import { EditActivityModal } from './EditActivityModal'
 import { MODAL } from '@/lib/ui'
 
 // canAdd = หน้านั้นบันทึกกิจกรรมได้ (ทะเบียนรับ) ไม่ใช่ = ดูอย่างเดียว
-type Props = { caseId: string; caseNo: string | null; patient: string | null; canAdd?: boolean; performer?: string | null }
+// canEdit = หน่วยบริการที่ถือเคสนี้อยู่ แก้/ลบกิจกรรมของตัวเองได้
+type Props = {
+  caseId: string; caseNo: string | null; patient: string | null
+  canAdd?: boolean; canEdit?: boolean; performer?: string | null
+}
 
-export function ActivityModal({ caseId, caseNo, patient, canAdd, performer }: Props) {
+export function ActivityModal({ caseId, caseNo, patient, canAdd, canEdit, performer }: Props) {
   const dlg = useRef<HTMLDialogElement>(null)
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<Activity[] | null>(null)
@@ -41,7 +46,7 @@ export function ActivityModal({ caseId, caseNo, patient, canAdd, performer }: Pr
     await load()
   }
 
-  const th = 'px-3 py-2 text-left text-sm font-medium whitespace-nowrap'
+  const th = 'px-3 py-2 text-left font-medium whitespace-nowrap'
   const td = 'px-3 py-2 align-top'
 
   return (
@@ -107,7 +112,7 @@ export function ActivityModal({ caseId, caseNo, patient, canAdd, performer }: Pr
           ) : rows.length === 0 ? (
             <p className="px-4 py-10 text-center text-xs text-fg-muted">ยังไม่มีกิจกรรม</p>
           ) : (
-            <table className="w-full border-collapse text-xs">
+            <table data-grid className="w-full border-collapse">
               <thead className="sticky top-0 bg-brand text-on-brand">
                 <tr className="border-b border-line">
                   <th className={`${th} text-right`}>ลำดับ</th>
@@ -117,6 +122,7 @@ export function ActivityModal({ caseId, caseNo, patient, canAdd, performer }: Pr
                   <th className={`${th} text-right`}>เอกสาร</th>
                   <th className={`${th} text-right`}>รูปภาพ</th>
                   <th className={th}>ผู้ดำเนินการ</th>
+                  {canEdit && <th className={`${th} text-center`}>แก้ไข</th>}
                 </tr>
               </thead>
               <tbody>
@@ -137,12 +143,18 @@ export function ActivityModal({ caseId, caseNo, patient, canAdd, performer }: Pr
                       <FileViewer files={r.photos} kind="image" title="ภาพกิจกรรม" />
                     </td>
                     <td className={td}>{r.performer ?? '—'}</td>
+                    {canEdit && (
+                      <td className={`${td} text-center`}>
+                        {/* ลำดับ 1/2 เป็นเหตุการณ์ที่ระบบสร้างจากวันแจ้ง/วันรับ ไม่มีแถวให้แก้ */}
+                        {r.id && <EditActivityModal act={r} caseNo={caseNo} onSaved={load} />}
+                      </td>
+                    )}
                   </tr>
                 ))}
                 {/* แถวสุดท้ายเป็นปุ่มเพิ่ม กิจกรรมใหม่ต่อท้ายไทม์ไลน์อยู่แล้ว ปุ่มจึงอยู่ตรงนี้ */}
                 {canAdd && (
                   <tr className="border-t border-line">
-                    <td colSpan={7} className="p-0">
+                    <td colSpan={canEdit ? 8 : 7} className="p-0">
                       <AddActivityModal
                         caseId={caseId}
                         caseNo={caseNo}

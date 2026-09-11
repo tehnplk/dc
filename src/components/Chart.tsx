@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   BarController, BarElement, CategoryScale, Chart as ChartJS, Filler, Legend,
   LineController, LineElement, LinearScale, PointElement, Tooltip,
-  type ChartConfiguration,
+  type ChartConfiguration, type ChartType,
 } from 'chart.js'
 
 // ลงทะเบียนเฉพาะที่ใช้ (tree-shaking ของ chart.js) ไม่เอา Chart.register(...registerables)
@@ -20,9 +20,13 @@ function themeColors() {
   return { primary: v('--primary'), line: v('--line'), muted: v('--fg-muted') }
 }
 
-type Props = { config: (c: ReturnType<typeof themeColors>) => ChartConfiguration; height: number }
+// generic ตามชนิดกราฟ ไม่งั้น callback ของ tooltip จะถูกมองเป็นชนิดรวมของทุกกราฟ
+type Props<T extends ChartType> = {
+  config: (c: ReturnType<typeof themeColors>) => ChartConfiguration<T>
+  height: number
+}
 
-export function Chart({ config, height }: Props) {
+export function Chart<T extends ChartType>({ config, height }: Props<T>) {
   const el = useRef<HTMLCanvasElement>(null)
   // นับรอบ re-render ตอนสลับธีม: chart.js วาดลง canvas สีจึงไม่อัปเดตเองเหมือน CSS
   const [themeTick, setThemeTick] = useState(0)
@@ -38,7 +42,7 @@ export function Chart({ config, height }: Props) {
 
   useEffect(() => {
     if (!el.current) return
-    const chart = new ChartJS(el.current, config(themeColors()))
+    const chart = new ChartJS(el.current, config(themeColors()) as ChartConfiguration)
     return () => chart.destroy()
   }, [config, themeTick])
 

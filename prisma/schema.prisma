@@ -10,39 +10,6 @@ datasource db {
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
-model app_user {
-  id                 BigInt            @id @default(autoincrement())
-  username           String            @unique
-  password_hash      String
-  full_name          String?
-  position           String?
-  email              String?
-  tel                String?
-  org_code           String
-  role               String
-  scope_area         String?
-  is_active          Boolean           @default(true)
-  last_login_at      DateTime?         @db.Timestamptz(6)
-  login_count        Int               @default(0)
-  created_at         DateTime          @default(now()) @db.Timestamptz(6)
-  org                c_org             @relation(fields: [org_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
-  adm_area           c_area?           @relation(fields: [scope_area], references: [code], onDelete: NoAction, onUpdate: NoAction)
-  accepted_cases     case_acceptance[] @relation("case_acceptance_accepted_byToapp_user")
-  released_cases     case_acceptance[] @relation("case_acceptance_released_byToapp_user")
-  created_activities case_activity[]   @relation("case_activity_created_byToapp_user")
-  updated_activities case_activity[]   @relation("case_activity_updated_byToapp_user")
-  approved_documents case_document[]   @relation("case_document_approved_byToapp_user")
-  created_documents  case_document[]   @relation("case_document_created_byToapp_user")
-  updated_documents  case_document[]   @relation("case_document_updated_byToapp_user")
-  created_cases      case_report[]     @relation("case_report_created_byToapp_user")
-  deleted_cases      case_report[]     @relation("case_report_deleted_byToapp_user")
-  updated_cases      case_report[]     @relation("case_report_updated_byToapp_user")
-  case_view_log      case_view_log[]
-
-  @@index([org_code], map: "app_user_org_idx")
-}
-
-/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model case_acceptance {
   id                    BigInt            @id @default(autoincrement())
   case_id               BigInt            @unique(map: "case_accept_one_active", where: raw("(status = 'active'::text)"))
@@ -55,10 +22,10 @@ model case_acceptance {
   released_by           BigInt?
   note                  String?
   transferred_from      BigInt?
-  accepted_by_user      app_user          @relation("case_acceptance_accepted_byToapp_user", fields: [accepted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  accepted_by_user      user              @relation("case_acceptance_accepted_byTouser", fields: [accepted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   case_report           case_report       @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   org                   c_org             @relation(fields: [org_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
-  released_by_user      app_user?         @relation("case_acceptance_released_byToapp_user", fields: [released_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  released_by_user      user?             @relation("case_acceptance_released_byTouser", fields: [released_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   case_acceptance       case_acceptance?  @relation("case_acceptanceTocase_acceptance", fields: [transferred_from], references: [id], onDelete: NoAction, onUpdate: NoAction)
   other_case_acceptance case_acceptance[] @relation("case_acceptanceTocase_acceptance")
 
@@ -83,9 +50,9 @@ model case_activity {
   updated_by      BigInt?
   activity_type   c_activity_type? @relation(fields: [activity_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   case_report     case_report      @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  created_by_user app_user?        @relation("case_activity_created_byToapp_user", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user user?            @relation("case_activity_created_byTouser", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   org             c_org?           @relation(fields: [performer_org], references: [code], onDelete: NoAction, onUpdate: NoAction)
-  updated_by_user app_user?        @relation("case_activity_updated_byToapp_user", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updated_by_user user?            @relation("case_activity_updated_byTouser", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   case_document   case_document[]
 
   @@index([case_id, date_act, time_act], map: "act_case_idx")
@@ -112,11 +79,11 @@ model case_document {
   updated_at       DateTime         @default(now()) @db.Timestamptz(6)
   updated_by       BigInt?
   case_activity    case_activity?   @relation(fields: [activity_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  approved_by_user app_user?        @relation("case_document_approved_byToapp_user", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  approved_by_user user?            @relation("case_document_approved_byTouser", fields: [approved_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   case_report      case_report      @relation(fields: [case_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
-  created_by_user  app_user?        @relation("case_document_created_byToapp_user", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user  user?            @relation("case_document_created_byTouser", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   form_template    c_form_template? @relation(fields: [form_template_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  updated_by_user  app_user?        @relation("case_document_updated_byToapp_user", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updated_by_user  user?            @relation("case_document_updated_byTouser", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([activity_id], map: "doc_act_idx", where: raw("(activity_id IS NOT NULL)"))
   @@index([case_id], map: "doc_case_idx")
@@ -178,12 +145,12 @@ model case_report {
   case_activity     case_activity[]
   case_document     case_document[]
   adm_area          c_area?                  @relation(fields: [area_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
-  created_by_user   app_user?                @relation("case_report_created_byToapp_user", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  deleted_by_user   app_user?                @relation("case_report_deleted_byToapp_user", fields: [deleted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  created_by_user   user?                    @relation("case_report_created_byTouser", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  deleted_by_user   user?                    @relation("case_report_deleted_byTouser", fields: [deleted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   disease           c_disease                @relation(fields: [disease_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   occupation        c_occupation?            @relation(fields: [occupation_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   org               c_org                    @relation(fields: [report_org_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
-  updated_by_user   app_user?                @relation("case_report_updated_byToapp_user", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  updated_by_user   user?                    @relation("case_report_updated_byTouser", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([area_code], map: "case_area_idx", where: raw("(deleted_at IS NULL)"))
   @@index([cid], map: "case_cid_idx", where: raw("(cid IS NOT NULL)"))
@@ -201,7 +168,7 @@ model case_view_log {
   viewed_at  DateTime @default(now()) @db.Timestamptz(6)
   ip         String?  @db.Inet
   user_agent String?
-  app_user   app_user @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  user       user     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([case_id], map: "viewlog_case_idx")
   @@index([user_id, viewed_at], map: "viewlog_user_idx")
@@ -232,12 +199,13 @@ model c_area {
   parent_code  String?
   population   Int?
   geom         Unsupported("geometry")?
-  app_user     app_user[]
+  deleted_at   DateTime?                @db.Timestamptz(6)
   c_area       c_area?                  @relation("c_areaToc_area", fields: [parent_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   other_c_area c_area[]                 @relation("c_areaToc_area")
   c_org        c_org[]
-  c_org_area   c_org_area[]
   case_report  case_report[]
+  hos_village  hos_village?
+  user         user[]
 
   @@index([geom], type: Gist)
   @@index([parent_code], map: "c_area_parent_idx")
@@ -287,27 +255,72 @@ model c_org {
   parent_code     String?
   is_active       Boolean                  @default(true)
   geom            Unsupported("geometry")?
-  app_user        app_user[]
+  deleted_at      DateTime?                @db.Timestamptz(6)
   c_area          c_area?                  @relation(fields: [area_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   c_org           c_org?                   @relation("c_orgToc_org", fields: [parent_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   other_c_org     c_org[]                  @relation("c_orgToc_org")
-  c_org_area      c_org_area[]
   case_acceptance case_acceptance[]
   case_activity   case_activity[]
   case_report     case_report[]
+  hos_village     hos_village[]
+  user            user[]
 
   @@index([area_code], map: "org_area_code_idx")
   @@index([parent_code], map: "org_parent_idx")
 }
 
-model c_org_area {
+model hos_village {
+  area_code String @id
   org_code  String
-  area_code String
   c_area    c_area @relation(fields: [area_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   c_org     c_org  @relation(fields: [org_code], references: [code], onDelete: Cascade, onUpdate: NoAction)
 
-  @@id([org_code, area_code])
-  @@index([area_code], map: "org_area_area_idx")
+  @@index([org_code], map: "hos_village_org_idx")
+}
+
+model user_role {
+  code       String @id
+  name       String
+  sort_order Int    @default(0)
+  user       user[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model user {
+  id                 BigInt            @id @default(autoincrement())
+  username           String            @unique
+  sso_sub            String?           @unique
+  cid                String?           @unique
+  password_hash      String?
+  full_name          String?
+  position           String?
+  email              String?
+  tel                String?
+  org_code           String
+  role               String
+  scope_area         String?
+  notify             Boolean           @default(true)
+  is_active          Boolean           @default(true)
+  last_login_at      DateTime?         @db.Timestamptz(6)
+  login_count        Int               @default(0)
+  created_at         DateTime          @default(now()) @db.Timestamptz(6)
+  deleted_at         DateTime?         @db.Timestamptz(6)
+  accepted_cases     case_acceptance[] @relation("case_acceptance_accepted_byTouser")
+  released_cases     case_acceptance[] @relation("case_acceptance_released_byTouser")
+  created_activities case_activity[]   @relation("case_activity_created_byTouser")
+  updated_activities case_activity[]   @relation("case_activity_updated_byTouser")
+  approved_documents case_document[]   @relation("case_document_approved_byTouser")
+  created_documents  case_document[]   @relation("case_document_created_byTouser")
+  updated_documents  case_document[]   @relation("case_document_updated_byTouser")
+  created_cases      case_report[]     @relation("case_report_created_byTouser")
+  deleted_cases      case_report[]     @relation("case_report_deleted_byTouser")
+  updated_cases      case_report[]     @relation("case_report_updated_byTouser")
+  case_view_log      case_view_log[]
+  c_org              c_org             @relation(fields: [org_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  user_role          user_role         @relation(fields: [role], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  c_area             c_area?           @relation(fields: [scope_area], references: [code], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([org_code], map: "user_org_idx")
 }
 
 view geography_columns {

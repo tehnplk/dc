@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/db'
+import { currentUser } from '@/lib/session'
 import { Filters, type Opt } from '@/components/Filters'
 import { CaseTable } from '@/components/CaseTable'
 import { SearchBox } from '@/components/SearchBox'
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function Home({ searchParams }: PageProps<'/patients'>) {
   const sp = await searchParams
+  const me = await currentUser()   // คุกกี้ถูกแต่บัญชีถูกลบ/ปิด ต้องหลุดที่นี่
   const one = (v: string | string[] | undefined) => (typeof v === 'string' && v ? v : undefined)
 
   const page = pageOf(sp.page)
@@ -32,7 +34,7 @@ export default async function Home({ searchParams }: PageProps<'/patients'>) {
     prisma.v_case_list.count({ where: { ...where, date_accept: null } }),
     // อำเภอทั้งหมดของจังหวัด ไม่ใช่เฉพาะที่มีเคส ตัวเลือกจะได้ไม่ขยับตามข้อมูล
     prisma.c_area.findMany({
-      where: { level: 2 },
+      where: { level: 2, deleted_at: null },
       select: { code: true, name: true },
       orderBy: { code: 'asc' },
     }),
@@ -65,7 +67,12 @@ export default async function Home({ searchParams }: PageProps<'/patients'>) {
         </div>
       </header>
 
-      <CaseTable cases={cases} empty="ไม่มีเคสตามเงื่อนไขที่เลือก" page={page} total={total} />
+      {/* สสจ. บันทึกกิจกรรมได้ทุกเคส · สสอ. เฉพาะอำเภอตัวเอง (server ตรวจซ้ำอีกชั้น) */}
+      <CaseTable cases={cases} empty="ไม่มีเคสตามเงื่อนไขที่เลือก" page={page} total={total}
+                 canAccept={me.canCase}
+                 canAdd={!me.readonly && (me.role === 'province' || me.role === 'district')}
+                 addAmp={me.role === 'district' ? me.amp : null}
+                 performer={me.full_name} />
 
     </main>
   )

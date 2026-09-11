@@ -12,3 +12,7 @@ export function pageOf(v: string | string[] | undefined) {
   const n = Number(typeof v === 'string' ? v : 1)
   return Number.isInteger(n) && n >= 1 && n <= 100000 ? n : 1
 }
+
+/** ช่องกรอกมาตรฐานในฟอร์ม — อยู่ที่นี่เพื่อให้ server component import ได้ด้วย */
+export const field =
+  'block w-full rounded-sm border border-line bg-surface px-2 py-1.5 text-sm text-fg transition-colors duration-150 hover:border-primary focus:border-primary'

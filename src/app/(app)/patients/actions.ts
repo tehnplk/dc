@@ -7,10 +7,13 @@ import { currentUser } from '@/lib/session'
 export type CaseFile = { id: string; name: string | null; path: string }
 
 export type Activity = {
+  /** id ของแถวใน case_activity — null = ลำดับ 1/2 ที่ view สร้างเอง แก้/ลบไม่ได้ */
+  id: string | null
   seq: number
   date: string | null
   time: string | null
   name: string | null
+  note: string | null
   docs: CaseFile[]      // pdf เท่านั้น (DB มี CHECK บังคับไว้)
   photos: CaseFile[]
   performer: string | null
@@ -67,10 +70,12 @@ export async function getCase(caseId: string): Promise<{ head: CaseHead | null; 
   }
 
   return { head, rows: rows.map((r) => ({
+    id: r.activity_id === null ? null : String(r.activity_id),
     seq: r.seq ?? 0,
     date: r.date_act ? r.date_act.toISOString() : null,
     time: r.time_act_txt,
     name: r.activity_name,
+    note: r.note,
     docs: files(r.documents),
     photos: files(r.photos),
     performer: r.performer,
@@ -85,6 +90,8 @@ export async function acceptCase(_prev: AcceptState, fd: FormData): Promise<Acce
   if (typeof caseId !== 'string' || !/^\d{1,18}$/.test(caseId)) return { error: 'เคสไม่ถูกต้อง' }
 
   const me = await currentUser()
+  if (me.readonly) return { error: 'บัญชีผู้ดูแลระบบดูข้อมูลผู้ป่วยได้อย่างเดียว' }
+  if (!me.canCase) return { error: 'บทบาทของคุณรับเคสไม่ได้' }
   try {
     // วัน/เวลารับ ปล่อยให้ DEFAULT ของ DB ลง (เวลาไทย) ไม่ใช่นาฬิกาของ node
     await prisma.case_acceptance.create({
@@ -95,9 +102,7 @@ export async function acceptCase(_prev: AcceptState, fd: FormData): Promise<Acce
     const code = (e as { code?: string }).code
     // P2010/P2002 = ชนกติกาที่ DB ไม่ใช่บั๊ก บอกเป็นภาษาคนไป ที่เหลือกลืนไว้
     if (code === 'P2002') return { error: 'เคสนี้มีหน่วยอื่นกดรับไปแล้ว' }
-    if (String(e).includes('ไม่อยู่ในพื้นที่รับผิดชอบ')) {
-      return { error: `เคสนี้ไม่อยู่ในพื้นที่รับผิดชอบของ ${me.org.name}` }
-    }
+    if (String(e).includes('รับเคสไม่ได้')) return { error: 'บทบาทของคุณรับเคสไม่ได้' }
     console.error('acceptCase', e)
     return { error: 'รับเคสไม่สำเร็จ ลองใหม่อีกครั้ง' }
   }

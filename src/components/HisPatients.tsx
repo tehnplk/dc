@@ -5,7 +5,7 @@ import { CircleAlert, RefreshCw, Search } from 'lucide-react'
 import { AGENT_URL, fetchHisPatients, type HisPatient } from '@/lib/his'
 import { ReportCaseModal, type AreaOpt, type Disease, type Prefill } from './ReportCaseModal'
 
-const th = 'px-3 py-2 text-left text-sm font-medium whitespace-nowrap'
+const th = 'px-3 py-2 text-left font-medium whitespace-nowrap'
 const td = 'px-3 py-2 align-top whitespace-nowrap'
 
 type State =
@@ -19,7 +19,7 @@ const MSG = {
   bad: 'โปรแกรมตอบกลับมาในรูปแบบที่อ่านไม่ได้',
 }
 
-type Props = { areas: AreaOpt[]; diseases: Disease[]; reporter: string | null; tel: string | null }
+type Props = { areas: AreaOpt[]; diseases: Disease[]; reporter: string | null; tel: string | null; canReport?: boolean }
 
 /** HIS ส่ง ICD10 มา ระบบเราคีย์ด้วยรหัสโรครายงาน จับคู่ผ่าน c_disease.icd10 */
 function toPrefill(p: HisPatient, diseases: Disease[]): Prefill {
@@ -34,7 +34,7 @@ function toPrefill(p: HisPatient, diseases: Disease[]): Prefill {
   }
 }
 
-export function HisPatients({ areas, diseases, reporter, tel }: Props) {
+export function HisPatients({ areas, diseases, reporter, tel, canReport = true }: Props) {
   const [state, setState] = useState<State>({ s: 'loading' })
   // รายการนี้อยู่ในหน่วยความจำอยู่แล้ว (ดึงมาทั้งก้อนจาก agent) กรองสดในเครื่องได้เลย
   const [q, setQ] = useState('')
@@ -103,7 +103,7 @@ export function HisPatients({ areas, diseases, reporter, tel }: Props) {
       </div>
 
       <div className="overflow-x-auto rounded-sm border border-line bg-surface">
-        <table className="w-full border-collapse text-xs">
+        <table data-grid className="w-full border-collapse">
           <thead className="bg-brand text-on-brand">
             <tr className="border-b border-line">
               <th className={th}>HN</th>
@@ -121,7 +121,7 @@ export function HisPatients({ areas, diseases, reporter, tel }: Props) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={10} className="px-3 py-10 text-center text-xs text-fg-muted">
+                <td colSpan={10} className="px-3 py-10 text-center text-fg-muted">
                   ไม่มีผู้ป่วยเข้าเกณฑ์รายงานใน HIS
                 </td>
               </tr>
@@ -139,10 +139,10 @@ export function HisPatients({ areas, diseases, reporter, tel }: Props) {
                 <td className={td}>{p.diag_name ?? p.diag_code ?? '—'}</td>
                 <td className={td}>{p.patient_type ?? '—'}</td>
                 <td className={`${td} text-center`}>
-                  <ReportCaseModal
+                  {canReport && <ReportCaseModal
                     areas={areas} diseases={diseases} reporter={reporter} tel={tel}
                     initial={toPrefill(p, diseases)} trigger="row"
-                  />
+                  />}
                 </td>
               </tr>
             ))}

@@ -85,10 +85,17 @@ await upsert('c_org', ['code', 'name', 'org_type', 'area_code', 'is_active'], 'c
     })))
 
 // ---- 3. พื้นที่รับผิดชอบของแต่ละหน่วย (ทิ้งแถวที่ชี้ไปหน่วย/พื้นที่ที่ไม่มีจริง)
+// ระบบเดิมให้หมู่บ้านเดียวมีได้หลายหน่วย ระบบใหม่บังคับ 1 หมู่บ้าน = 1 หน่วย
+// เลือกรหัสหน่วยน้อยสุดไว้ ผลลัพธ์เหมือนเดิมทุกครั้งที่ import ไม่ขึ้นกับลำดับแถว
 const orgCodes = new Set((await db.query('SELECT code FROM c_org')).rows.map((r) => r.code))
-const pcumoo = rows('cpcumoo', "'org_code',pcucode,'area_code',moo")
-  .filter((r) => orgCodes.has(r.org_code) && areaCodes.has(r.area_code))
-await upsert('c_org_area', ['org_code', 'area_code'], 'org_code,area_code', [], pcumoo)
+const byVillage = new Map()
+for (const r of rows('cpcumoo', "'org_code',pcucode,'area_code',moo")) {
+  if (!orgCodes.has(r.org_code) || !areaCodes.has(r.area_code)) continue
+  const cur = byVillage.get(r.area_code)
+  if (!cur || r.org_code < cur.org_code) byVillage.set(r.area_code, r)
+}
+const pcumoo = [...byVillage.values()]
+await upsert('hos_village', ['area_code', 'org_code'], 'area_code', ['org_code'], pcumoo)
 
 // ---- 4. อาชีพ
 await upsert('c_occupation', ['code', 'name'], 'code', ['name'],

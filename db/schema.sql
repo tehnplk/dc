@@ -20,7 +20,8 @@ CREATE TABLE c_area (
   name        text NOT NULL,
   parent_code text REFERENCES c_area(code),
   population  integer,
-  geom        geometry(Geometry, 4326)
+  geom        geometry(Geometry, 4326),
+  deleted_at  timestamptz                -- soft delete: ซ่อนจากตัวเลือก แต่เคสเก่ายังอ้างชื่อได้
 );
 CREATE INDEX c_area_parent_idx ON c_area (parent_code);
 CREATE INDEX c_area_geom_idx     ON c_area USING gist (geom);
@@ -33,18 +34,21 @@ CREATE TABLE c_org (
   area_code text REFERENCES c_area,
   parent_code text REFERENCES c_org(code),   -- รพ.สต. -> สสอ. -> สสจ.
   is_active boolean NOT NULL DEFAULT true,
-  geom      geometry(Point, 4326)
+  geom      geometry(Point, 4326),
+  deleted_at timestamptz                 -- soft delete: ซ่อนจากตัวเลือก แต่เคสเก่ายังอ้างชื่อได้
 );
 CREATE INDEX org_area_code_idx ON c_org (area_code);
 CREATE INDEX org_parent_idx    ON c_org (parent_code);
 
 -- พื้นที่รับผิดชอบ ใช้ routing เคสเข้าหน่วยที่ต้องลงควบคุมโรคอัตโนมัติ
-CREATE TABLE c_org_area (
-  org_code  text REFERENCES c_org ON DELETE CASCADE,
-  area_code text REFERENCES c_area,
-  PRIMARY KEY (org_code, area_code)
+-- หมู่บ้านที่แต่ละหน่วยบริการรับผิดชอบ (มาจาก cpcumoo ของระบบเดิม: pcucode + moo)
+-- หน่วยบริการ 1 แห่ง ดูแลได้หลายหมู่บ้าน แต่หมู่บ้าน 1 แห่งมีหน่วยบริการเดียว
+-- area_code จึงเป็น PK ไม่ใช่คู่ (org_code, area_code) — ระบบเดิมซ้ำได้ ทำให้เคสเดียวเข้า inbox หลายหน่วย
+CREATE TABLE hos_village (
+  area_code text PRIMARY KEY REFERENCES c_area,
+  org_code  text NOT NULL REFERENCES c_org ON DELETE CASCADE
 );
-CREATE INDEX org_area_area_idx ON c_org_area (area_code);
+CREATE INDEX hos_village_org_idx ON hos_village (org_code);
 
 CREATE TABLE c_occupation (
   code text PRIMARY KEY,
@@ -88,23 +92,46 @@ CREATE TABLE c_form_template (
 
 -- ========== 2. ผู้ใช้ (ต้องสังกัดหน่วยงานเสมอ) ==========
 
-CREATE TABLE app_user (
+-- บทบาทของผู้ใช้ เป็นตารางไม่ใช่ CHECK จะได้เอาชื่อไทยไปแสดงบนจอได้ตรงกันทุกที่
+CREATE TABLE user_role (
+  code       text PRIMARY KEY,
+  name       text NOT NULL,
+  sort_order int NOT NULL DEFAULT 0
+);
+
+-- จังหวัด   = สสจ. ทำได้ทุกอย่างทั้งจังหวัด (รับข้ามพื้นที่ โยกเคส จัดการระบบ)
+-- อำเภอ     = สสอ. บันทึกกิจกรรมของเคสในอำเภอตัวเองได้
+-- หน่วยบริการ = รับ/ทำงานเฉพาะหมู่บ้านที่ตัวเองรับผิดชอบ
+INSERT INTO user_role (code,name,sort_order) VALUES
+ ('province','จังหวัด',1),
+ ('district','อำเภอ',2),
+ ('hospital','หน่วยบริการ',3);
+
+-- ชื่อ user เป็นคำสงวนของ SQL จึงต้องใส่ "..." ทุกครั้งที่อ้างถึง
+CREATE TABLE "user" (
   id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   username      text UNIQUE NOT NULL,
-  password_hash text NOT NULL,              -- argon2id/bcrypt เท่านั้น
+  sso_sub       text UNIQUE,                -- subject จาก PLKHealth SSO (ผู้ใช้ที่ล็อกอินด้วย SSO)
+  cid           text UNIQUE CHECK (cid ~ '^[0-9]{13}$'),   -- เลขบัตรผู้ใช้ กรอกเองตอนตั้งค่าบัญชีครั้งแรก
+  password_hash text,                       -- argon2id/bcrypt เท่านั้น — NULL = เข้าได้ทาง SSO อย่างเดียว
   full_name     text,
   position      text,
   email         text,
   tel           text,
   org_code      text NOT NULL REFERENCES c_org,   -- สังกัด บังคับ
-  role          text NOT NULL CHECK (role IN ('admin','province','district','hospital','pcu')),
+  role          text NOT NULL REFERENCES user_role,
   scope_area    text REFERENCES c_area,   -- ขอบเขตข้อมูลที่เห็น (NULL = อนุมานจาก c_org)
+  notify        boolean NOT NULL DEFAULT true,   -- รับแจ้งเตือนการส่งเคสผ่านไลน์หมอพร้อม
   is_active     boolean NOT NULL DEFAULT true,
   last_login_at timestamptz,
   login_count   int NOT NULL DEFAULT 0,
-  created_at    timestamptz NOT NULL DEFAULT now()
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  deleted_at    timestamptz,             -- soft delete: ประวัติการแจ้ง/รับเคสยังชี้มาที่แถวนี้ได้
+
+  -- ต้องเข้าได้ทางใดทางหนึ่ง ไม่มีทั้งคู่ = บัญชีที่ล็อกอินไม่ได้เลย
+  CHECK (num_nonnulls(sso_sub, password_hash) >= 1)
 );
-CREATE INDEX app_user_org_idx ON app_user (org_code);
+CREATE INDEX user_org_idx ON "user" (org_code);
 
 -- ========== 3. แจ้งเคส ==========
 
@@ -168,11 +195,11 @@ CREATE TABLE case_report (
   time_report       time          DEFAULT (now() AT TIME ZONE 'Asia/Bangkok')::time,  -- เวลาที่รายงาน
 
   created_at timestamptz NOT NULL DEFAULT now(),
-  created_by bigint REFERENCES app_user,
+  created_by bigint REFERENCES "user",
   updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by bigint REFERENCES app_user,
+  updated_by bigint REFERENCES "user",
   deleted_at timestamptz,
-  deleted_by bigint REFERENCES app_user,
+  deleted_by bigint REFERENCES "user",
   delete_reason text,
 
   CHECK (date_onset <= coalesce(date_visit, date_onset))
@@ -186,7 +213,7 @@ CREATE INDEX case_geom_idx          ON case_report USING gist (geom);
 CREATE INDEX case_detail_idx        ON case_report USING gin (detail);
 
 -- ========== 4. รับเคส ==========
--- ไม่มีการมอบหมาย: หน่วยงานเห็นเคสที่ตกในพื้นที่รับผิดชอบตัวเอง (c_org_area) แล้วกดรับเอง
+-- ไม่มีการมอบหมาย: หน่วยงานเห็นเคสที่ตกในพื้นที่รับผิดชอบตัวเอง (hos_village) แล้วกดรับเอง
 -- หนึ่งแถวต่อการรับหนึ่งครั้ง ประวัติจึงอยู่ครบ สถานะของแถว:
 --   active      = เจ้าของเคสปัจจุบัน (มีได้ทีละแถวเดียวต่อเคส)
 --   released    = ผู้ใช้กดยกเลิกรับเคสเอง -> เคสกลับเข้า inbox ให้คนอื่นมากดรับ
@@ -198,11 +225,11 @@ CREATE TABLE case_acceptance (
   org_code    text   NOT NULL REFERENCES c_org,          -- หน่วยงานที่กดรับ
   date_accept date NOT NULL DEFAULT (now() AT TIME ZONE 'Asia/Bangkok')::date,  -- วันที่รับเคส
   time_accept time          DEFAULT (now() AT TIME ZONE 'Asia/Bangkok')::time,  -- เวลาที่รับเคส
-  accepted_by bigint NOT NULL REFERENCES app_user,     -- ผู้กดรับ
+  accepted_by bigint NOT NULL REFERENCES "user",     -- ผู้กดรับ
   status      text   NOT NULL DEFAULT 'active'
               CHECK (status IN ('active','released','transferred')),
   released_at timestamptz,
-  released_by bigint REFERENCES app_user,              -- ผู้กดยกเลิก / admin ที่โยกเคส
+  released_by bigint REFERENCES "user",              -- ผู้กดยกเลิก / admin ที่โยกเคส
   note        text   CHECK (length(note) <= 255),          -- เหตุผลตอนคืน/โยกเคส
   transferred_from bigint REFERENCES case_acceptance(id),  -- แถวเดิมที่ถูกโยกมา (NULL = กดรับเอง)
 
@@ -213,18 +240,17 @@ CREATE INDEX case_accept_org_idx  ON case_acceptance (org_code, status);
 -- เจ้าของเคสที่ active ได้ทีละหน่วยเดียว = กันสองหน่วยกดรับพร้อมกัน
 CREATE UNIQUE INDEX case_accept_one_active ON case_acceptance (case_id) WHERE status = 'active';
 
--- 1) กดรับได้เฉพาะเคสที่ตกในพื้นที่รับผิดชอบตัวเอง (admin/สสจ. และการถูกโยก ข้ามได้)
+-- 1) รับเคสได้เฉพาะบทบาท province/hospital (อำเภอมีหน้าที่บันทึกกิจกรรม ไม่ใช่ถือเคส)
+--    ไม่ดูที่อยู่ผู้ป่วยว่าตรงกับหมู่บ้านรับผิดชอบไหม — เคสข้ามเขต/ย้ายที่อยู่มีจริง
+--    หน่วยที่กดรับคือหน่วยที่รับผิดชอบต่อ (hos_village ใช้จัดลำดับ inbox เท่านั้น)
 -- 2) sync case_report.status ให้เอง ทุก action จึงเขียนตารางเดียว ไม่มีทางลืมอัปเดตสถานะ
 CREATE FUNCTION case_acceptance_sync() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
-  IF NEW.status = 'active' AND NEW.transferred_from IS NULL AND NOT (
-       EXISTS (SELECT 1 FROM case_report c
-                 JOIN c_org_area oa ON oa.area_code = c.area_code
-                WHERE c.id = NEW.case_id AND oa.org_code = NEW.org_code)
-    OR EXISTS (SELECT 1 FROM app_user u
-                WHERE u.id = NEW.accepted_by AND u.role IN ('admin','province'))
+  IF NEW.status = 'active' AND NEW.transferred_from IS NULL AND NOT EXISTS (
+       SELECT 1 FROM "user" u
+        WHERE u.id = NEW.accepted_by AND u.role IN ('province','hospital')
   ) THEN
-    RAISE EXCEPTION 'เคส % ไม่อยู่ในพื้นที่รับผิดชอบของ %', NEW.case_id, NEW.org_code
+    RAISE EXCEPTION 'บทบาทของผู้ใช้ % รับเคสไม่ได้', NEW.accepted_by
       USING ERRCODE = 'check_violation';
   END IF;
 
@@ -246,10 +272,10 @@ CREATE FUNCTION case_transfer(p_case_id bigint, p_by bigint, p_to_user bigint, p
 RETURNS bigint LANGUAGE plpgsql AS $fn$
 DECLARE v_from bigint; v_to_org text; v_new bigint;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM app_user WHERE id = p_by AND role IN ('admin','province')) THEN
+  IF NOT EXISTS (SELECT 1 FROM "user" WHERE id = p_by AND role = 'province') THEN
     RAISE EXCEPTION 'โยกเคสได้เฉพาะ admin/สสจ.' USING ERRCODE = 'insufficient_privilege';
   END IF;
-  SELECT org_code INTO v_to_org FROM app_user WHERE id = p_to_user AND is_active;
+  SELECT org_code INTO v_to_org FROM "user" WHERE id = p_to_user AND is_active;
   IF v_to_org IS NULL THEN
     RAISE EXCEPTION 'ไม่พบผู้ใช้ปลายทาง %', p_to_user USING ERRCODE = 'foreign_key_violation';
   END IF;
@@ -284,9 +310,9 @@ CREATE TABLE case_activity (
   performer_org text REFERENCES c_org,                     -- หน่วยงานผู้ดำเนินการ ถ้าระบุได้
   note          text     CHECK (length(note) <= 1000),   -- รายละเอียด
   created_at timestamptz NOT NULL DEFAULT now(),         -- ใครบันทึกคือ created_by (คนละคนกับผู้ดำเนินการได้)
-  created_by bigint REFERENCES app_user,
+  created_by bigint REFERENCES "user",
   updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by bigint REFERENCES app_user,
+  updated_by bigint REFERENCES "user",
 
   -- สองรหัสนี้เป็นของลำดับ 1/2 ที่ระบบสร้างเอง ห้ามบันทึกซ้ำเข้ามา
   CHECK (activity_code NOT IN ('REPORT','ACCEPT')),
@@ -313,11 +339,11 @@ CREATE TABLE case_document (
                    CHECK (status IN ('draft','submitted','approved','rejected')),
   submitted_at     timestamptz,
   approved_at      timestamptz,
-  approved_by      bigint REFERENCES app_user,
+  approved_by      bigint REFERENCES "user",
   created_at timestamptz NOT NULL DEFAULT now(),
-  created_by bigint REFERENCES app_user,
+  created_by bigint REFERENCES "user",
   updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by bigint REFERENCES app_user,
+  updated_by bigint REFERENCES "user",
 
   CHECK ((form_template_id IS NOT NULL) <> (file_path IS NOT NULL)),  -- เป็นฟอร์ม หรือ ไฟล์ อย่างใดอย่างหนึ่ง
   -- ไฟล์แนบรับแค่ 2 อย่าง: ภาพกิจกรรม กับเอกสาร pdf
@@ -333,7 +359,7 @@ CREATE INDEX doc_data_idx ON case_document USING gin (data);
 CREATE TABLE case_view_log (
   id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   case_id    bigint NOT NULL,
-  user_id    bigint NOT NULL REFERENCES app_user,
+  user_id    bigint NOT NULL REFERENCES "user",
   viewed_at  timestamptz NOT NULL DEFAULT now(),
   ip         inet,
   user_agent text
@@ -418,7 +444,7 @@ WITH ev AS (
          a.note
   FROM (SELECT DISTINCT ON (case_id) * FROM case_acceptance ORDER BY case_id, date_accept, time_accept, id) a
   LEFT JOIN c_org      o ON o.code = a.org_code
-  LEFT JOIN app_user u ON u.id   = a.accepted_by
+  LEFT JOIN "user" u ON u.id   = a.accepted_by
 
   UNION ALL
   -- ลำดับ 3+
@@ -505,7 +531,7 @@ LEFT JOIN c_area tmb ON tmb.code = left(c.area_code, 6)
 LEFT JOIN c_area amp ON amp.code = left(c.area_code, 4)
 LEFT JOIN case_acceptance a ON a.case_id = c.id AND a.status = 'active'
 LEFT JOIN c_org      ao  ON ao.code  = a.org_code
-LEFT JOIN app_user au  ON au.id    = a.accepted_by
+LEFT JOIN "user" au  ON au.id    = a.accepted_by
 WHERE c.deleted_at IS NULL;
 
 -- หน้า "เคสรอรับ": เคสที่ตกในพื้นที่รับผิดชอบของหน่วยงาน และยังไม่มีใครรับ
@@ -522,7 +548,7 @@ SELECT
      + make_interval(hours => d.investigate_within_hours)) AS investigate_due_at
 FROM case_report c
 JOIN c_disease  d  ON d.code = c.disease_code
-JOIN c_org_area oa ON oa.area_code = c.area_code           -- "อยู่พื้นที่ตัวเอง"
+JOIN hos_village oa ON oa.area_code = c.area_code           -- "อยู่พื้นที่ตัวเอง"
 WHERE c.deleted_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM case_acceptance a WHERE a.case_id = c.id AND a.status = 'active');
 

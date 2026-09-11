@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { CircleAlert, Undo2 } from 'lucide-react'
-import { releaseCase, type ReleaseState } from '@/app/accept/actions'
+import { releaseCase, type ReleaseState } from '@/app/(app)/accept/actions'
 
 type Props = { caseId: string; caseNo: string | null; patient: string | null }
 

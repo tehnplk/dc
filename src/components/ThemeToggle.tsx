@@ -48,20 +48,26 @@ export function ThemeToggle() {
 
   const dark = theme === 'dark'
   const label = theme === null ? 'สลับธีม' : dark ? 'โหมดมืด' : 'โหมดสว่าง'
-  const action = theme === null ? '' : ` (กดเพื่อเปลี่ยนเป็น${dark ? 'สว่าง' : 'มืด'})`
-  const Icon = dark ? Moon : Sun
 
   return (
     <button
       type="button"
       onClick={toggle}
-      title={label + action}
-      aria-label={label + action}
-      aria-pressed={dark}
-      className="flex size-11 cursor-pointer items-center justify-center rounded-sm text-fg-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
+      role="switch"
+      aria-checked={dark}
+      aria-label={`${label} (กดเพื่อสลับ)`}
+      className="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-sm text-fg-muted transition-colors duration-150 hover:bg-surface-2 hover:text-fg"
     >
-      {/* ก่อน mount ยังไม่รู้ธีมจริง ซ่อนไอคอนไว้กันไอคอนกระพริบผิดด้าน */}
-      <Icon size={20} strokeWidth={1.75} aria-hidden className={theme ? '' : 'invisible'} />
+      {/* ก่อน mount ยังไม่รู้ธีมจริง ซ่อนไว้กันสวิตช์กระพริบผิดด้าน */}
+      <span className={theme ? 'contents' : 'invisible contents'}>
+        {dark
+          ? <Moon size={15} strokeWidth={1.75} aria-hidden />
+          : <Sun size={15} strokeWidth={1.75} aria-hidden />}
+        <span className="flex-1 text-left">{label}</span>
+        <span className={`flex h-5 w-9 shrink-0 items-center rounded-full p-0.5 transition-colors duration-150 ${dark ? 'bg-primary' : 'bg-line'}`}>
+          <span className={`size-4 rounded-full bg-surface transition-transform duration-150 ${dark ? 'translate-x-4' : ''}`} />
+        </span>
+      </span>
     </button>
   )
 }

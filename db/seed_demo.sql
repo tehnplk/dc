@@ -1,7 +1,7 @@
 -- ข้อมูลตัวอย่างสำหรับ dev: 3 เคส 1 เคสถูกรับแล้วพร้อมกิจกรรม/เอกสาร
 -- smoke_test.sql \i ไฟล์นี้แล้ว rollback / db:seed รันแล้ว commit
 -- identity ไม่ถูก rollback จึงต้อง restart ให้ id คงที่ทุกครั้งที่รัน
-ALTER TABLE app_user        ALTER COLUMN id RESTART WITH 1;
+ALTER TABLE "user"        ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE c_form_template   ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE case_report     ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE case_acceptance ALTER COLUMN id RESTART WITH 1;
@@ -13,7 +13,8 @@ INSERT INTO c_area (code,level,name,parent_code,population) VALUES
  ('6501',2,'เมืองพิษณุโลก','65',293444),
  ('650101',3,'ในเมือง','6501',40000),
  ('65010101',4,'ชุมชนวัดจันทร์ตะวันตก','650101',1651),
- ('65010102',4,'ชุมชนไชยานุภาพ','650101',720)
+ ('65010102',4,'ชุมชนไชยานุภาพ','650101',720),
+ ('65010103',4,'ชุมชนประชาอุทิศ','650101',830)
   ON CONFLICT (code) DO NOTHING;
 UPDATE c_area SET geom = ST_SetSRID(ST_MakePoint(100.2600,16.8200),4326) WHERE code='65010101';
 UPDATE c_area SET geom = ST_SetSRID(ST_MakePoint(100.2605,16.8205),4326) WHERE code='65010102';
@@ -25,15 +26,15 @@ INSERT INTO c_org (code,name,org_type,area_code) VALUES
  ('07477','รพ.สต.ท่าทอง','รพ.สต.','650101')
   ON CONFLICT (code) DO NOTHING;
 -- รพ.สต. สองแห่งรับผิดชอบคนละหมู่ ใช้ทดสอบว่าใครกดรับเคสไหนได้
-INSERT INTO c_org_area VALUES ('07476','65010101'), ('07476','65010102'), ('07477','65010102')
-  ON CONFLICT (org_code,area_code) DO NOTHING;
+INSERT INTO hos_village (area_code, org_code) VALUES ('65010101','07476'), ('65010102','07476'), ('65010103','07477')
+  ON CONFLICT (area_code) DO NOTHING;
 
 -- full_name = ชื่อ-นามสกุลจริงของคน ตำแหน่งแยกไว้ที่ position
-INSERT INTO app_user (username,password_hash,full_name,position,org_code,role) VALUES
+INSERT INTO "user" (username,password_hash,full_name,position,org_code,role) VALUES
  ('hos01','$argon2id$dummy','สมพงษ์ เวชกิจ','พยาบาลวิชาชีพชำนาญการ','10676','hospital'),
- ('pcu01','$argon2id$dummy','มาลี สุขใจ','นักวิชาการสาธารณสุขชำนาญการ','07476','pcu'),
- ('pcu02','$argon2id$dummy','ประยุทธ ทองดี','เจ้าพนักงานสาธารณสุขชำนาญงาน','07477','pcu'),
- ('adm01','$argon2id$dummy','วิไลวรรณ ระบาดวิทยา','นักระบาดวิทยาชำนาญการพิเศษ','00051','admin');
+ ('pcu01','$argon2id$dummy','มาลี สุขใจ','นักวิชาการสาธารณสุขชำนาญการ','07476','hospital'),
+ ('pcu02','$argon2id$dummy','ประยุทธ ทองดี','เจ้าพนักงานสาธารณสุขชำนาญงาน','07477','hospital'),
+ ('adm01','$argon2id$dummy','วิไลวรรณ ระบาดวิทยา','นักระบาดวิทยาชำนาญการพิเศษ','00051','province');
 
 INSERT INTO c_form_template (code,name,disease_code,schema) VALUES
  ('DHF-IV',E'แบบสอบสวนโรคไข้เลือดออกเฉพาะราย','26','{"fields":[{"k":"travel_14d","t":"bool"},{"k":"hi","t":"number"}]}');

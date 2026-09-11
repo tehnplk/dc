@@ -35,7 +35,7 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
     prisma.v_case_list.count({ where: { report_org_code: me.org_code } }),
     prisma.v_case_list.count({ where: { ...where, date_accept: null } }),
     prisma.c_area.findMany({
-      where: { level: { in: [2, 3, 4] } },
+      where: { level: { in: [2, 3, 4] }, deleted_at: null },
       select: { code: true, name: true, level: true },
       orderBy: { code: 'asc' },
     }),
@@ -55,7 +55,10 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {!his && <SearchBox />}
-          <ReportCaseModal areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} />
+          {/* ไม่มีปุ่มที่กดแล้วถูกปฏิเสธ: บัญชีผู้ดูแลระบบดูอย่างเดียว และ สสอ. แจ้งเคสไม่ได้ */}
+          {me.canCase && (
+            <ReportCaseModal areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} />
+          )}
         </div>
       </header>
 
@@ -66,7 +69,7 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
       </nav>
 
       {his ? (
-        <HisPatients areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} />
+        <HisPatients areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} canReport={me.canCase} />
       ) : (
         // หน้านี้เป็นทะเบียนของผู้แจ้ง การกดรับเป็นงานฝั่งพื้นที่ ไม่ใช่ที่นี่
         <CaseTable cases={cases} empty="หน่วยงานยังไม่ได้แจ้งเคส"

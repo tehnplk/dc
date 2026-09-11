@@ -118,6 +118,17 @@ body {
   outline-offset: 2px;
 }
 
+/* ขนาดตัวอักษรของตารางข้อมูล ปรับจากเมนูผู้ใช้ มีผลเฉพาะ [data-grid]
+   หัวตารางใหญ่กว่าเซลล์ 2px เสมอ ผูกกับค่าเดียวไม่ต้องตั้งสองที่ */
+:root { --grid-fs: 12px; }
+:root[data-grid-font='sm'] { --grid-fs: 11px; }
+:root[data-grid-font='lg'] { --grid-fs: 14px; }
+
+[data-grid] { font-size: var(--grid-fs); }
+[data-grid] th { font-size: calc(var(--grid-fs) + 2px); }
+/* บรรทัดรองในเซลล์ (เวลา/อายุ/ผู้รับ) ให้ย่อขยายตามไปด้วย */
+[data-grid] .sub { font-size: 0.9em; }
+
 /* กำลังค้นอยู่: หรี่ผลลัพธ์ให้รู้ว่ากำลังอัปเดต แต่ยังเห็นของเดิม ไม่วูบเป็นหน้าว่าง
    ธงมาจาก SearchBox (data-busy บน <main>) เพราะส่ง prop ข้ามขอบ server component ไม่ได้ */
 main > :not(header):not(nav) {

@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { createCase, type FormState } from '@/app/report/actions'
+import { createCase, type FormState } from '@/app/(app)/report/actions'
 import { MAX_IMAGES } from '@/lib/upload'
 import { FilePicker } from './FilePicker'
 import { MODAL } from '@/lib/ui'

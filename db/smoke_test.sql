@@ -77,12 +77,20 @@ BEGIN
   -- trigger sync สถานะเคสให้เอง ไม่ต้องอัปเดต case_report แยก
   ASSERT (SELECT status FROM case_report WHERE id=1) = 'accepted', 'รับเคสแล้ว status ต้องเป็น accepted';
 
-  -- กดรับเคสนอกพื้นที่รับผิดชอบไม่ได้ (รพ.สต.ท่าทอง ไม่ได้ดูหมู่ของเคส 1)
-  -- รพ.พุทธชินราช ไม่มีพื้นที่รับผิดชอบใน c_org_area จึงกดรับเคสที่ว่างอยู่ไม่ได้
+  -- รับเคสนอกหมู่บ้านรับผิดชอบได้ (รพ.พุทธชินราช ไม่มีแถวใน hos_village เลย)
+  INSERT INTO case_acceptance (case_id,org_code,accepted_by) VALUES (2,'10676',1);
+  ASSERT (SELECT status FROM case_report WHERE id=2) = 'accepted',
+    'รับเคสนอกพื้นที่รับผิดชอบต้องทำได้';
+  UPDATE case_acceptance SET status='released', released_at=now(), released_by=1
+   WHERE case_id=2 AND status='active';
+
+  -- บทบาทอำเภอรับเคสไม่ได้
   BEGIN
+    UPDATE "user" SET role='district' WHERE id=1;
     INSERT INTO case_acceptance (case_id,org_code,accepted_by) VALUES (2,'10676',1);
-    ASSERT false, 'ควร reject การกดรับเคสนอกพื้นที่';
+    ASSERT false, 'ควร reject การรับเคสของบทบาทอำเภอ';
   EXCEPTION WHEN check_violation THEN NULL; END;
+  UPDATE "user" SET role='hospital' WHERE id=1;
 
   -- user กดยกเลิกรับเคสเอง -> เคสกลับเข้า inbox และ status กลับเป็น reported
   UPDATE case_acceptance SET status='released', released_at=now(), released_by=2,
@@ -117,7 +125,7 @@ BEGIN
   -- คนที่ไม่ใช่ admin โยกเคสไม่ได้
   BEGIN
     PERFORM case_transfer(1, 2, 3, 'ไม่ควรผ่าน');
-    ASSERT false, 'ควร reject การโยกเคสโดยผู้ใช้ทั่วไป';
+    ASSERT false, 'ควร reject การโยกเคสโดยหน่วยบริการ';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 
   -- รับใหม่แล้ว ลำดับ 2 ยังชี้การรับครั้งแรกเสมอ
@@ -149,6 +157,12 @@ BEGIN
     ASSERT false, 'ควร reject รายละเอียดเกิน 1000 ตัว';
   EXCEPTION WHEN check_violation THEN NULL; END;
 
+  -- หมู่บ้านหนึ่งมีหน่วยบริการรับผิดชอบได้หน่วยเดียว
+  BEGIN
+    INSERT INTO hos_village (area_code, org_code) VALUES ('65010101','07477');
+    ASSERT false, 'ควร reject หมู่บ้านที่มีหน่วยรับผิดชอบอยู่แล้ว';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+
   -- ไฟล์แนบรับแค่ภาพกับ pdf
   BEGIN
     INSERT INTO case_document (case_id,file_path,file_name,mime_type)
@@ -162,9 +176,29 @@ BEGIN
     ASSERT false, 'ควร reject เอกสารที่เป็นทั้งฟอร์มและไฟล์';
   EXCEPTION WHEN check_violation THEN NULL; END;
 
+  -- บัญชีต้องเข้าได้ทางใดทางหนึ่ง (รหัสผ่าน หรือ SSO)
+  BEGIN
+    INSERT INTO "user" (username,org_code,role) VALUES ('nologin','10676','hospital');
+    ASSERT false, 'ควร reject บัญชีที่ไม่มีทั้งรหัสผ่านและ SSO';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO "user" (username,sso_sub,org_code,role) VALUES ('sso1','sub-abc','10676','hospital');
+  ASSERT (SELECT password_hash FROM "user" WHERE username='sso1') IS NULL,
+         'ผู้ใช้ SSO ไม่ต้องมีรหัสผ่าน';
+
+  -- เลขบัตรผู้ใช้ต้องเป็นตัวเลข 13 หลักและห้ามซ้ำ
+  BEGIN
+    INSERT INTO "user" (username,sso_sub,cid,org_code,role) VALUES ('badcid','s-bad','12345','10676','hospital');
+    ASSERT false, 'ควร reject เลขบัตรที่ไม่ใช่ 13 หลัก';
+  EXCEPTION WHEN check_violation THEN NULL; END;
+  INSERT INTO "user" (username,sso_sub,cid,org_code,role) VALUES ('cid1','s-c1','1650100000001','10676','hospital');
+  BEGIN
+    INSERT INTO "user" (username,sso_sub,cid,org_code,role) VALUES ('cid2','s-c2','1650100000001','10676','hospital');
+    ASSERT false, 'ควร reject เลขบัตรซ้ำ';
+  EXCEPTION WHEN unique_violation THEN NULL; END;
+
   -- ผู้ใช้ต้องสังกัดหน่วยงาน
   BEGIN
-    INSERT INTO app_user (username,password_hash,org_code,role) VALUES ('x','h',NULL,'pcu');
+    INSERT INTO "user" (username,password_hash,org_code,role) VALUES ('x','h',NULL,'hospital');
     ASSERT false, 'ควร reject ผู้ใช้ที่ไม่มีสังกัด';
   EXCEPTION WHEN not_null_violation THEN NULL; END;
 

@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react'
 import { fmtDate } from '@/lib/datetime'
+import type { TooltipItem } from 'chart.js'
 import { Chart } from './Chart'
 
 export function EpiCurve({ data }: { data: { wk: string; cases: number }[] }) {
@@ -38,8 +39,9 @@ export function EpiCurve({ data }: { data: { wk: string; cases: number }[] }) {
           tooltip: {
             callbacks: {
               // หัว tooltip เป็นวันที่เต็ม ป้ายแกนย่อเหลือ วว/ดด ไม่งั้นซ้อนกัน
-              title: (items: { dataIndex: number }[]) => `สัปดาห์ ${fmtDate(new Date(data[items[0].dataIndex].wk))}`,
-              label: (i: { parsed: { y: number } }) => ` ${i.parsed.y} ราย`,
+              title: (items: TooltipItem<'line'>[]) =>
+                `สัปดาห์ ${fmtDate(new Date(data[items[0].dataIndex].wk))}`,
+              label: (i: TooltipItem<'line'>) => ` ${i.parsed.y} ราย`,
             },
           },
         },

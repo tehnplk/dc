@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { CircleAlert, HandHelping } from 'lucide-react'
-import { acceptCase, type AcceptState } from '@/app/patients/actions'
+import { acceptCase, type AcceptState } from '@/app/(app)/patients/actions'
 
 type Props = { caseId: string; caseNo: string | null; patient: string | null; place: string | null }
 

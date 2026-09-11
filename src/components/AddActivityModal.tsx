@@ -2,7 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef, useState } from 'react'
 import { Plus, X } from 'lucide-react'
-import { addActivity, type ActivityState } from '@/app/accept/actions'
+import { addActivity, type ActivityState } from '@/app/(app)/accept/actions'
 import { MAX_IMAGES } from '@/lib/upload'
 import { FilePicker } from './FilePicker'
 import { MODAL } from '@/lib/ui'

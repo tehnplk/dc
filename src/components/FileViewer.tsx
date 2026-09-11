@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { FileText, Image as ImageIcon, X } from 'lucide-react'
-import type { CaseFile } from '@/app/patients/actions'
+import type { CaseFile } from '@/app/(app)/patients/actions'
 import { MODAL } from '@/lib/ui'
 
 type Props = { files: CaseFile[]; kind: 'image' | 'pdf'; title: string }

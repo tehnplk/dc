@@ -56,7 +56,7 @@ WITH ev AS (
         ) a
         LEFT JOIN c_org o ON ((o.code = a.org_code))
       )
-      LEFT JOIN app_user u ON ((u.id = a.accepted_by))
+      LEFT JOIN "user" u ON ((u.id = a.accepted_by))
     )
   UNION
   ALL
