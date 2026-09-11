@@ -70,7 +70,7 @@ export default async function Home({ searchParams }: PageProps<'/patients'>) {
       {/* สสจ. บันทึกกิจกรรมได้ทุกเคส · สสอ. เฉพาะอำเภอตัวเอง (server ตรวจซ้ำอีกชั้น) */}
       <CaseTable cases={cases} empty="ไม่มีเคสตามเงื่อนไขที่เลือก" page={page} total={total}
                  canAccept={me.canCase}
-                 canAdd={!me.readonly && (me.role === 'province' || me.role === 'district')}
+                 canAdd={me.role === 'province' || me.role === 'district'}
                  addAmp={me.role === 'district' ? me.amp : null}
                  performer={me.full_name} />
 

@@ -43,11 +43,13 @@ CREATE TABLE user_role (
 ## บัญชีสำรอง (SUPER_USER)
 
 บัญชีที่ตั้งใน `.env` (`SUPER_USER` / `SUPER_USER_PASSWORD`) ล็อกอินที่ `/auth/admin` ไม่ผ่าน SSO
-มีไว้กู้ระบบตอน SSO ล่มหรือยังไม่มีใครเป็นผู้ดูแล — **ไม่ใช่บทบาท** แต่เป็นแฟล็กแยกต่างหาก
+มีไว้กู้ระบบตอน SSO ล่มหรือยังไม่มีใครเป็นผู้ดูแล
 
-- จัดการระบบได้เต็ม (`canManage`)
-- ข้อมูลผู้ป่วย **ดูได้อย่างเดียว** (`readonly`) — แจ้งเคส/รับเคส/บันทึกกิจกรรมไม่ได้เลย
 - แถวใน `users` ถูกสร้าง/อัปเดตให้อัตโนมัติตอนล็อกอิน โดยตั้ง role เป็น `province`
+- **สิทธิ์เท่ากับบทบาทจังหวัดทุกอย่าง** ไม่มีสิทธิ์พิเศษและไม่ถูกจำกัดเพิ่ม
+  หลังล็อกอินแล้วระบบไม่แยกว่าเข้ามาทางไหน ทุกอย่างตัดสินจาก `role` อย่างเดียว
+- ประวัติการแจ้ง/รับเคสจะขึ้นชื่อ "ผู้ดูแลระบบ (บัญชีสำรอง)" ไม่ใช่ชื่อเจ้าหน้าที่จริง
+  จึงควรใช้เฉพาะตอนกู้ระบบ ไม่ใช่ใช้ทำงานประจำวัน
 
 ## จุดที่บังคับกติกาจริง
 
@@ -56,7 +58,7 @@ CREATE TABLE user_role (
 
 | ที่ | ทำอะไร |
 |---|---|
-| `src/lib/session.ts` | `canManage = super \|\| province` · `canCase = !super && (province \|\| hospital)` · `amp` = อำเภอของหน่วยงานที่สังกัด |
+| `src/lib/session.ts` | `canManage = province` · `canCase = province \|\| hospital` · `amp` = อำเภอของหน่วยงานที่สังกัด |
 | `src/lib/scope.ts` | ขอบเขตหมู่บ้าน: province = ทั้งจังหวัด · district = prefix อำเภอ · hospital = รายการใน `hos_village` |
 | `src/app/(app)/report/actions.ts` | `createCase` — ต้อง `canCase` |
 | `src/app/(app)/patients/actions.ts` | `acceptCase` — ต้อง `canCase` |

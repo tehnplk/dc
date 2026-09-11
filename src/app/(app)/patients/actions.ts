@@ -90,7 +90,6 @@ export async function acceptCase(_prev: AcceptState, fd: FormData): Promise<Acce
   if (typeof caseId !== 'string' || !/^\d{1,18}$/.test(caseId)) return { error: 'เคสไม่ถูกต้อง' }
 
   const me = await currentUser()
-  if (me.readonly) return { error: 'บัญชีผู้ดูแลระบบดูข้อมูลผู้ป่วยได้อย่างเดียว' }
   if (!me.canCase) return { error: 'บทบาทของคุณรับเคสไม่ได้' }
   try {
     // วัน/เวลารับ ปล่อยให้ DEFAULT ของ DB ลง (เวลาไทย) ไม่ใช่นาฬิกาของ node

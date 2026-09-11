@@ -94,7 +94,10 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
                       caseId={String(c.id)}
                       caseNo={c.case_no}
                       patient={c.patient_name}
-                      place={[c.tmb_name, c.amp_name].filter(Boolean).join(' · ') || null}
+                      sub={c.patient_sub}
+                      disease={c.disease_name}
+                      addr={[c.addr_no, c.moo && `หมู่ ${c.moo}`, c.tmb_name && `ต.${c.tmb_name}`,
+                             c.amp_name && `อ.${c.amp_name}`].filter(Boolean).join(' ')}
                     />
                   : <span className="rounded-sm bg-warn-soft px-1.5 py-0.5 font-sans sub font-medium text-warn">
                       รอรับเคส

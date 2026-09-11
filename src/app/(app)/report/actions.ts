@@ -25,7 +25,6 @@ const date = (fd: FormData, k: string) => {
 
 export async function createCase(_prev: FormState, fd: FormData): Promise<FormState> {
   const me = await currentUser()
-  if (me.readonly) return { error: 'บัญชีผู้ดูแลระบบดูข้อมูลผู้ป่วยได้อย่างเดียว' }
   if (!me.canCase) return { error: 'บทบาทของคุณแจ้งเคสไม่ได้' }
 
   const disease_code = str(fd, 'disease_code')

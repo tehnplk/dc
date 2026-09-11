@@ -39,7 +39,6 @@ type User = {
   email: string | null
   role: string
   roleName: string
-  super: boolean
   me: Me
 }
 
@@ -104,7 +103,7 @@ export function Sidebar({ user }: { user: User | null }) {
       <ul className="flex flex-col gap-0.5 p-2">
         {(user
           ? [...nav,
-             ...(user.super || user.role === 'province' ? [adminNav]
+             ...(user.role === 'province' ? [adminNav]
                : user.role === 'hospital' ? [areaNav] : [])]
           // ยังไม่ล็อกอิน: /dashboard เป็นหน้าเดียวที่เปิดสาธารณะ เมนูอื่นกดไปก็โดนเด้ง
           : nav.filter((n) => n.href === '/dashboard')

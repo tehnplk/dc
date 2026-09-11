@@ -40,7 +40,6 @@ async function cannotAdd(me: Me, caseId: bigint): Promise<string | null> {
  * จังหวัด/อำเภอ เพิ่มได้อย่างเดียว — ของที่บันทึกไปแล้วเป็นหลักฐานของพื้นที่
  */
 async function ownedActivity(me: Me, activityId: bigint) {
-  if (me.readonly) return { error: 'บัญชีผู้ดูแลระบบดูข้อมูลผู้ป่วยได้อย่างเดียว' as const }
   if (me.role !== 'hospital') return { error: 'บทบาทของคุณแก้ไข/ลบกิจกรรมไม่ได้' as const }
 
   const act = await prisma.case_activity.findUnique({
@@ -75,7 +74,6 @@ export async function addActivity(_prev: ActivityState, fd: FormData): Promise<A
   if (bad) return { error: bad }
 
   const me = await currentUser()
-  if (me.readonly) return { error: 'บัญชีผู้ดูแลระบบดูข้อมูลผู้ป่วยได้อย่างเดียว' }
 
   const id = BigInt(caseId)
   const denied = await cannotAdd(me, id)
@@ -134,7 +132,6 @@ export async function releaseCase(_prev: ReleaseState, fd: FormData): Promise<Re
   if (typeof caseId !== 'string' || !/^\d{1,18}$/.test(caseId)) return { error: 'เคสไม่ถูกต้อง' }
 
   const me = await currentUser()
-  if (me.readonly) return { error: 'บัญชีผู้ดูแลระบบดูข้อมูลผู้ป่วยได้อย่างเดียว' }
   const note = str(fd, 'note')
   if (note && note.length > 255) return { error: 'เหตุผลยาวเกิน 255 ตัวอักษร' }
 

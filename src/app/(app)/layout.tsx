@@ -14,15 +14,14 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               tel: true, org_code: true, notify: true, c_org: { select: { name: true } },
               user_role: { select: { name: true } } },
   });
-  // บัญชีสำรองจาก .env = สิทธิ์จัดการระบบ (ไม่ได้อยู่ใน role)
-  const me = row && { ...row, super: Boolean(process.env.SUPER_USER) && row.username === process.env.SUPER_USER };
+  const me = row;
 
   return (
     <>
       <Sidebar
         user={me && {
           name: me.full_name, position: me.position, org: me.c_org.name,
-          email: me.email, role: me.role, roleName: me.user_role.name, super: me.super,
+          email: me.email, role: me.role, roleName: me.user_role.name,
           me: { cid: me.cid, tel: me.tel, org_code: me.org_code, org_name: me.c_org.name, notify: me.notify },
         }}
       />

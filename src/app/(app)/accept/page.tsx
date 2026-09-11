@@ -58,9 +58,9 @@ export default async function Page({ searchParams }: PageProps<'/accept'>) {
         empty="หน่วยงานยังไม่ได้รับเคส"
         unit={false}
         addr
-        canAdd={!me.readonly}
-        canEdit={!me.readonly && me.role === 'hospital'}
-        canRelease={!me.readonly}
+        canAdd
+        canEdit={me.role === 'hospital'}
+        canRelease
         canAccept={false}
         performer={me.full_name}
         page={page}
