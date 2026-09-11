@@ -1,12 +1,9 @@
 'use server'
 
-import { randomUUID } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
-import path from 'node:path'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
-import { MAX_IMAGES, MAX_IMAGE_BYTES, MAX_PDF_BYTES, isImage, isPdf } from '@/lib/upload'
+import { checkFiles, filesOf, saveUpload } from '@/lib/files'
 
 export type ActivityState = { error?: string; ok?: string }
 
@@ -29,18 +26,9 @@ export async function addActivity(_prev: ActivityState, fd: FormData): Promise<A
   if (activity_name.length > 255) return { error: 'กิจกรรมยาวเกิน 255 ตัวอักษร' }
   if (note && note.length > 1000) return { error: 'รายละเอียดยาวเกิน 1000 ตัวอักษร' }
 
-  // ค่ามาจาก client ทั้งชนิดและขนาด ต้องตรวจซ้ำที่นี่ การบีบรูปฝั่งเบราว์เซอร์ข้ามได้
-  const files = fd.getAll('files').filter((f): f is File => f instanceof File && f.size > 0)
-  if (files.filter((f) => isImage(f.type)).length > MAX_IMAGES) {
-    return { error: `แนบรูปได้ไม่เกิน ${MAX_IMAGES} รูป` }
-  }
-  for (const f of files) {
-    if (!isImage(f.type) && !isPdf(f.type)) return { error: `${f.name} ไม่ใช่รูปหรือ PDF` }
-    const cap = isImage(f.type) ? MAX_IMAGE_BYTES : MAX_PDF_BYTES
-    if (f.size > cap) {
-      return { error: `${f.name} ใหญ่เกิน ${Math.round(cap / 1024 / 1024)} MB` }
-    }
-  }
+  const files = filesOf(fd)
+  const bad = checkFiles(files)
+  if (bad) return { error: bad }
 
   const me = await currentUser()
 
@@ -55,7 +43,7 @@ export async function addActivity(_prev: ActivityState, fd: FormData): Promise<A
   try {
     // เขียนไฟล์ก่อนค่อยลง DB: ถ้า DB พังจะเหลือไฟล์กำพร้าซึ่งกวาดทีหลังได้
     // กลับกันถ้าลง DB ก่อนแล้วเขียนไฟล์พัง จะได้แถวที่ชี้ไฟล์ที่ไม่มีอยู่จริง
-    const saved = await Promise.all(files.map(save))
+    const saved = await Promise.all(files.map(saveUpload))
 
     created = await prisma.$transaction(async (tx) => {
       const act = await tx.case_activity.create({
@@ -94,19 +82,6 @@ export async function addActivity(_prev: ActivityState, fd: FormData): Promise<A
   revalidatePath('/accept')
   // ส่ง id กลับไป ไม่ใช่ข้อความคงที่ ฝั่ง client ใช้ค่านี้เป็นตัวรู้ว่า "บันทึกรอบใหม่แล้ว"
   return { ok: String(created.id) }
-}
-
-/** เก็บไฟล์ลง public/uploads/ปี/เดือน/ ชื่อสุ่ม กันชื่อซ้ำและกันชื่อไฟล์ผู้ใช้พาออกนอกโฟลเดอร์ */
-async function save(f: File) {
-  const now = new Date(Date.now() + 7 * 3600_000)          // โฟลเดอร์ตามเดือนไทย
-  const rel = `/uploads/${now.getUTCFullYear()}/${String(now.getUTCMonth() + 1).padStart(2, '0')}`
-  const dir = path.join(process.cwd(), 'public', rel)
-  await mkdir(dir, { recursive: true })
-
-  const ext = isPdf(f.type) ? 'pdf' : (f.type.split('/')[1] || 'bin').replace(/[^a-z0-9]/g, '')
-  const name = `${randomUUID()}.${ext}`
-  await writeFile(path.join(dir, name), Buffer.from(await f.arrayBuffer()))
-  return { path: `${rel}/${name}`, name: f.name.slice(0, 255), mime: f.type, size: f.size }
 }
 
 export type ReleaseState = { error?: string; ok?: string }

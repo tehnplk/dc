@@ -16,6 +16,7 @@ export function Filters({ filters }: { filters: Filter[] }) {
     const next = new URLSearchParams(params)
     if (code) next.set(key, code)
     else next.delete(key)
+    next.delete('page')   // เปลี่ยนตัวกรองแล้วต้องกลับหน้า 1 ไม่งั้นค้างหน้าที่ชุดใหม่ไม่มี
     // push ไม่ใช่ replace เพื่อให้ปุ่ม back ของเบราว์เซอร์ย้อนตัวกรองได้
     start(() => router.push(next.size ? `${pathname}?${next}` : pathname))
   }

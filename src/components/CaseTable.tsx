@@ -1,8 +1,10 @@
 import { fmtDate as d } from '@/lib/datetime'
 import { ActivityModal } from './ActivityModal'
 import { AcceptButton } from './AcceptButton'
+import { Pagination } from './Pagination'
 import { ReleaseButton } from './ReleaseButton'
 import type { v_case_list } from '@/generated/prisma/models'
+import { PAGE_SIZE } from '@/lib/ui'
 
 const th = 'px-3 py-2 text-left text-sm font-medium whitespace-nowrap'  // ใหญ่กว่าเซลล์ 2px
 const td = 'px-3 py-2 align-top whitespace-nowrap'
@@ -22,13 +24,15 @@ function DateTime({ date, time }: { date: Date | null; time: string | null }) {
 
 // from = คอลัมน์ "จาก" ทะเบียนแจ้งไม่ต้องมี เพราะเป็นหน่วยงานตัวเองทุกแถวอยู่แล้ว
 // canAdd = หน้านั้นให้บันทึกกิจกรรมได้ (ทะเบียนรับ) ไม่ส่ง = ดูได้อย่างเดียว
-export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd, canAccept = true, canRelease, performer = null }:
-  { cases: v_case_list[]; empty: string; from?: boolean; unit?: boolean; addr?: boolean; canAdd?: boolean; canAccept?: boolean; canRelease?: boolean; performer?: string | null }) {
+export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd, canAccept = true, canRelease, performer = null, page, total }:
+  { cases: v_case_list[]; empty: string; from?: boolean; unit?: boolean; addr?: boolean; canAdd?: boolean; canAccept?: boolean; canRelease?: boolean; performer?: string | null; page?: number; total?: number }) {
   return (
-    // ตารางกว้าง ต้องเลื่อนในกล่องตัวเอง ไม่ใช่ดันทั้งหน้าให้เลื่อนแนวนอน
+    <>
+    {/* ตารางกว้าง ต้องเลื่อนในกล่องตัวเอง ไม่ใช่ดันทั้งหน้าให้เลื่อนแนวนอน */}
     <div className="overflow-x-auto rounded-sm border border-line bg-surface">
       <table className="w-full border-collapse text-xs">
-        <thead className="bg-surface-2 text-fg-muted">
+        {/* หัวตารางใช้สีแบรนด์ทึบ ให้ตัดกับแถบสลับสีที่เป็น surface-2 จาง ๆ */}
+        <thead className="bg-brand text-on-brand">
           <tr className="border-b border-line">
             <th className={`${th} text-right`}>ลำดับ</th>
             {from && <th className={th}>จาก</th>}
@@ -52,9 +56,10 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
               <td colSpan={10 + (from ? 1 : 0) + (unit ? 1 : 0) + (addr ? 1 : 0) + (canRelease ? 1 : 0)} className="px-3 py-10 text-center text-xs text-fg-muted">{empty}</td>
             </tr>
           )}
+          {/* แถบสลับสี: อ่านข้ามคอลัมน์ไม่หลุดบรรทัด — hover ใช้คนละสีจะได้ไม่จมไปกับแถบ */}
           {cases.map((c) => (
             <tr key={String(c.id)}
-                className="border-b border-line transition-colors duration-150 last:border-0 hover:bg-surface-2">
+                className="border-b border-line transition-colors duration-150 last:border-0 odd:bg-surface-2/50 hover:bg-primary-soft">
               <td className={`${num} text-right text-fg-muted`}>{String(c.id)}</td>
               {from && <td className={td}>{c.report_org_name ?? c.report_org_code}</td>}
               <td className={num}><DateTime date={c.date_dx} time={c.time_dx_txt} /></td>
@@ -123,5 +128,7 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
         </tbody>
       </table>
     </div>
+    {total !== undefined && <Pagination page={page ?? 1} pageSize={PAGE_SIZE} total={total} />}
+    </>
   )
 }

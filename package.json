@@ -12,11 +12,15 @@
     "db:pull": "prisma db pull && node prisma/postpull.mjs && prisma format && prisma generate",
     "db:check": "tsx prisma/check.mts",
     "db:seed": "docker exec dc-postgis psql -U dc -d dc -v ON_ERROR_STOP=1 -q -f /db/seed_demo.sql",
+    "db:seed:cases": "docker exec dc-postgis psql -U dc -d dc -v ON_ERROR_STOP=1 -q -f /db/seed_cases.sql",
     "db:import": "node db/import_legacy.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "@types/leaflet": "^1.9.22",
+    "chart.js": "^4.5.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.44.0",
     "next": "16.3.4",
     "react": "19.2.8",

@@ -27,16 +27,46 @@ function files(v: unknown): CaseFile[] {
   })
 }
 
-export async function getCaseActivities(caseId: string): Promise<Activity[]> {
+/** หัวข้อย่อยของโมดัล — ข้อมูลผู้ป่วยที่ต้องเห็นตอนอ่านไทม์ไลน์ */
+export type CaseHead = {
+  name: string | null
+  gender: string | null
+  age: string | null
+  onset: string | null
+  visit: string | null
+  disease: string | null
+  ptype: string | null
+}
+
+export async function getCase(caseId: string): Promise<{ head: CaseHead | null; rows: Activity[] }> {
   // ค่ามาจากฝั่ง client ต้องกันไว้ก่อน BigInt() จะโยน error ถ้าไม่ใช่ตัวเลขล้วน
-  if (!/^\d{1,18}$/.test(caseId)) return []
+  if (!/^\d{1,18}$/.test(caseId)) return { head: null, rows: [] }
+  const id = BigInt(caseId)
 
-  const rows = await prisma.v_case_activity.findMany({
-    where: { case_id: BigInt(caseId) },
-    orderBy: { seq: 'asc' },
-  })
+  const [c, rows] = await Promise.all([
+    prisma.case_report.findUnique({
+      where: { id },
+      select: {
+        pname: true, fname: true, lname: true, gender: true, age_y: true, age_m: true,
+        date_onset: true, date_visit: true, patient_type: true,
+        disease: { select: { name_th: true } },
+      },
+    }),
+    prisma.v_case_activity.findMany({ where: { case_id: id }, orderBy: { seq: 'asc' } }),
+  ])
 
-  return rows.map((r) => ({
+  const head: CaseHead | null = c && {
+    name: [c.pname, c.fname, c.lname].filter(Boolean).join(' ') || null,
+    gender: c.gender === 'M' ? 'ชาย' : c.gender === 'F' ? 'หญิง' : null,
+    age: [c.age_y != null && `${c.age_y} ปี`, c.age_m != null && `${c.age_m} ด.`]
+      .filter(Boolean).join(' ') || null,
+    onset: c.date_onset?.toISOString() ?? null,
+    visit: c.date_visit?.toISOString() ?? null,
+    disease: c.disease?.name_th ?? null,
+    ptype: c.patient_type,
+  }
+
+  return { head, rows: rows.map((r) => ({
     seq: r.seq ?? 0,
     date: r.date_act ? r.date_act.toISOString() : null,
     time: r.time_act_txt,
@@ -44,7 +74,7 @@ export async function getCaseActivities(caseId: string): Promise<Activity[]> {
     docs: files(r.documents),
     photos: files(r.photos),
     performer: r.performer,
-  }))
+  })) }
 }
 
 export type AcceptState = { error?: string; ok?: string }

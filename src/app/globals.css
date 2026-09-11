@@ -118,6 +118,15 @@ body {
   outline-offset: 2px;
 }
 
+/* กำลังค้นอยู่: หรี่ผลลัพธ์ให้รู้ว่ากำลังอัปเดต แต่ยังเห็นของเดิม ไม่วูบเป็นหน้าว่าง
+   ธงมาจาก SearchBox (data-busy บน <main>) เพราะส่ง prop ข้ามขอบ server component ไม่ได้ */
+main > :not(header):not(nav) {
+  transition: opacity 150ms ease-out;
+}
+main[data-busy='true'] > :not(header):not(nav) {
+  opacity: 0.5;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after {
     animation-duration: 0.01ms !important;

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { checkFiles, filesOf, saveUpload } from '@/lib/files'
 
 export type FormState = { error?: string; ok?: string }
 
@@ -35,11 +36,19 @@ export async function createCase(_prev: FormState, fd: FormData): Promise<FormSt
   const date_visit = date(fd, 'date_visit')
   if (date_visit && date_visit < date_onset) return { error: 'วันที่พบต้องไม่ก่อนวันเริ่มป่วย' }
 
+  const files = filesOf(fd)
+  const bad = checkFiles(files)
+  if (bad) return { error: bad }
+
   const gender = str(fd, 'gender')
   const patient_type = str(fd, 'patient_type')
   const time_dx = str(fd, 'time_dx')
 
   try {
+    // เขียนไฟล์ก่อนค่อยลง DB: DB พังเหลือไฟล์กำพร้าที่กวาดทีหลังได้
+    // สลับลำดับจะได้แถวที่ชี้ไฟล์ที่ไม่มีอยู่จริงแทน
+    const saved = await Promise.all(files.map(saveUpload))
+
     const c = await prisma.case_report.create({
       data: {
         disease_code,
@@ -67,6 +76,13 @@ export async function createCase(_prev: FormState, fd: FormData): Promise<FormSt
         reporter_position: me.position,
         reporter_tel: str(fd, 'reporter_tel'),
         created_by: me.id,
+        // เอกสารระดับเคส (ไม่ผูกกิจกรรม) — activity_id เว้นว่างไว้
+        case_document: saved.length
+          ? { create: saved.map((f) => ({
+              file_path: f.path, file_name: f.name, mime_type: f.mime,
+              file_size: BigInt(f.size), created_by: me.id,
+            })) }
+          : undefined,
       },
       select: { case_no: true },
     })

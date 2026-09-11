@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   Activity,
+  ChartColumnBig,
   ClipboardPlus,
   Inbox,
   PanelLeftClose,
@@ -13,6 +14,7 @@ import {
 } from 'lucide-react'
 
 const nav = [
+  { href: '/dashboard', label: 'แดชบอร์ด', Icon: ChartColumnBig },
   { href: '/patients', label: 'ผู้ป่วยทั้งหมด', Icon: Users },
   { href: '/report', label: 'ทะเบียนแจ้ง', Icon: ClipboardPlus },
   { href: '/accept', label: 'ทะเบียนรับ', Icon: Inbox },
