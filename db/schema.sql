@@ -107,8 +107,7 @@ INSERT INTO user_role (code,name,sort_order) VALUES
  ('district','อำเภอ',2),
  ('hospital','หน่วยบริการ',3);
 
--- ชื่อ user เป็นคำสงวนของ SQL จึงต้องใส่ "..." ทุกครั้งที่อ้างถึง
-CREATE TABLE "user" (
+CREATE TABLE users (
   id            bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   username      text UNIQUE NOT NULL,
   sso_sub       text UNIQUE,                -- subject จาก PLKHealth SSO (ผู้ใช้ที่ล็อกอินด้วย SSO)
@@ -131,7 +130,7 @@ CREATE TABLE "user" (
   -- ต้องเข้าได้ทางใดทางหนึ่ง ไม่มีทั้งคู่ = บัญชีที่ล็อกอินไม่ได้เลย
   CHECK (num_nonnulls(sso_sub, password_hash) >= 1)
 );
-CREATE INDEX user_org_idx ON "user" (org_code);
+CREATE INDEX users_org_idx ON users (org_code);
 
 -- ========== 3. แจ้งเคส ==========
 
@@ -195,11 +194,11 @@ CREATE TABLE case_report (
   time_report       time          DEFAULT (now() AT TIME ZONE 'Asia/Bangkok')::time,  -- เวลาที่รายงาน
 
   created_at timestamptz NOT NULL DEFAULT now(),
-  created_by bigint REFERENCES "user",
+  created_by bigint REFERENCES users,
   updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by bigint REFERENCES "user",
+  updated_by bigint REFERENCES users,
   deleted_at timestamptz,
-  deleted_by bigint REFERENCES "user",
+  deleted_by bigint REFERENCES users,
   delete_reason text,
 
   CHECK (date_onset <= coalesce(date_visit, date_onset))
@@ -225,11 +224,11 @@ CREATE TABLE case_acceptance (
   org_code    text   NOT NULL REFERENCES c_org,          -- หน่วยงานที่กดรับ
   date_accept date NOT NULL DEFAULT (now() AT TIME ZONE 'Asia/Bangkok')::date,  -- วันที่รับเคส
   time_accept time          DEFAULT (now() AT TIME ZONE 'Asia/Bangkok')::time,  -- เวลาที่รับเคส
-  accepted_by bigint NOT NULL REFERENCES "user",     -- ผู้กดรับ
+  accepted_by bigint NOT NULL REFERENCES users,     -- ผู้กดรับ
   status      text   NOT NULL DEFAULT 'active'
               CHECK (status IN ('active','released','transferred')),
   released_at timestamptz,
-  released_by bigint REFERENCES "user",              -- ผู้กดยกเลิก / admin ที่โยกเคส
+  released_by bigint REFERENCES users,              -- ผู้กดยกเลิก / admin ที่โยกเคส
   note        text   CHECK (length(note) <= 255),          -- เหตุผลตอนคืน/โยกเคส
   transferred_from bigint REFERENCES case_acceptance(id),  -- แถวเดิมที่ถูกโยกมา (NULL = กดรับเอง)
 
@@ -247,7 +246,7 @@ CREATE UNIQUE INDEX case_accept_one_active ON case_acceptance (case_id) WHERE st
 CREATE FUNCTION case_acceptance_sync() RETURNS trigger LANGUAGE plpgsql AS $fn$
 BEGIN
   IF NEW.status = 'active' AND NEW.transferred_from IS NULL AND NOT EXISTS (
-       SELECT 1 FROM "user" u
+       SELECT 1 FROM users u
         WHERE u.id = NEW.accepted_by AND u.role IN ('province','hospital')
   ) THEN
     RAISE EXCEPTION 'บทบาทของผู้ใช้ % รับเคสไม่ได้', NEW.accepted_by
@@ -272,10 +271,10 @@ CREATE FUNCTION case_transfer(p_case_id bigint, p_by bigint, p_to_user bigint, p
 RETURNS bigint LANGUAGE plpgsql AS $fn$
 DECLARE v_from bigint; v_to_org text; v_new bigint;
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM "user" WHERE id = p_by AND role = 'province') THEN
+  IF NOT EXISTS (SELECT 1 FROM users WHERE id = p_by AND role = 'province') THEN
     RAISE EXCEPTION 'โยกเคสได้เฉพาะ admin/สสจ.' USING ERRCODE = 'insufficient_privilege';
   END IF;
-  SELECT org_code INTO v_to_org FROM "user" WHERE id = p_to_user AND is_active;
+  SELECT org_code INTO v_to_org FROM users WHERE id = p_to_user AND is_active;
   IF v_to_org IS NULL THEN
     RAISE EXCEPTION 'ไม่พบผู้ใช้ปลายทาง %', p_to_user USING ERRCODE = 'foreign_key_violation';
   END IF;
@@ -310,9 +309,9 @@ CREATE TABLE case_activity (
   performer_org text REFERENCES c_org,                     -- หน่วยงานผู้ดำเนินการ ถ้าระบุได้
   note          text     CHECK (length(note) <= 1000),   -- รายละเอียด
   created_at timestamptz NOT NULL DEFAULT now(),         -- ใครบันทึกคือ created_by (คนละคนกับผู้ดำเนินการได้)
-  created_by bigint REFERENCES "user",
+  created_by bigint REFERENCES users,
   updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by bigint REFERENCES "user",
+  updated_by bigint REFERENCES users,
 
   -- สองรหัสนี้เป็นของลำดับ 1/2 ที่ระบบสร้างเอง ห้ามบันทึกซ้ำเข้ามา
   CHECK (activity_code NOT IN ('REPORT','ACCEPT')),
@@ -339,11 +338,11 @@ CREATE TABLE case_document (
                    CHECK (status IN ('draft','submitted','approved','rejected')),
   submitted_at     timestamptz,
   approved_at      timestamptz,
-  approved_by      bigint REFERENCES "user",
+  approved_by      bigint REFERENCES users,
   created_at timestamptz NOT NULL DEFAULT now(),
-  created_by bigint REFERENCES "user",
+  created_by bigint REFERENCES users,
   updated_at timestamptz NOT NULL DEFAULT now(),
-  updated_by bigint REFERENCES "user",
+  updated_by bigint REFERENCES users,
 
   CHECK ((form_template_id IS NOT NULL) <> (file_path IS NOT NULL)),  -- เป็นฟอร์ม หรือ ไฟล์ อย่างใดอย่างหนึ่ง
   -- ไฟล์แนบรับแค่ 2 อย่าง: ภาพกิจกรรม กับเอกสาร pdf
@@ -359,7 +358,7 @@ CREATE INDEX doc_data_idx ON case_document USING gin (data);
 CREATE TABLE case_view_log (
   id         bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   case_id    bigint NOT NULL,
-  user_id    bigint NOT NULL REFERENCES "user",
+  user_id    bigint NOT NULL REFERENCES users,
   viewed_at  timestamptz NOT NULL DEFAULT now(),
   ip         inet,
   user_agent text
@@ -444,7 +443,7 @@ WITH ev AS (
          a.note
   FROM (SELECT DISTINCT ON (case_id) * FROM case_acceptance ORDER BY case_id, date_accept, time_accept, id) a
   LEFT JOIN c_org      o ON o.code = a.org_code
-  LEFT JOIN "user" u ON u.id   = a.accepted_by
+  LEFT JOIN users u ON u.id   = a.accepted_by
 
   UNION ALL
   -- ลำดับ 3+
@@ -531,7 +530,7 @@ LEFT JOIN c_area tmb ON tmb.code = left(c.area_code, 6)
 LEFT JOIN c_area amp ON amp.code = left(c.area_code, 4)
 LEFT JOIN case_acceptance a ON a.case_id = c.id AND a.status = 'active'
 LEFT JOIN c_org      ao  ON ao.code  = a.org_code
-LEFT JOIN "user" au  ON au.id    = a.accepted_by
+LEFT JOIN users au  ON au.id    = a.accepted_by
 WHERE c.deleted_at IS NULL;
 
 -- หน้า "เคสรอรับ": เคสที่ตกในพื้นที่รับผิดชอบของหน่วยงาน และยังไม่มีใครรับ

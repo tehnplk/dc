@@ -35,7 +35,7 @@ export async function GET(req: Request) {
   }
 
   // เคยล็อกอินแล้ว = มีบัญชีและหน่วยงานที่จับคู่ไว้แล้ว เข้าได้เลย
-  const existing = await prisma.user.findUnique({
+  const existing = await prisma.users.findUnique({
     where: { sso_sub: p.sub },
     select: { id: true, is_active: true },
   })
@@ -49,7 +49,7 @@ export async function GET(req: Request) {
   }
   if (!existing.is_active) return fail(req, 'บัญชีนี้ถูกปิดการใช้งาน')
 
-  const user = await prisma.user.update({
+  const user = await prisma.users.update({
     where: { id: existing.id },
     data: {
       full_name: p.name,

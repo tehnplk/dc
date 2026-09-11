@@ -86,11 +86,11 @@ BEGIN
 
   -- บทบาทอำเภอรับเคสไม่ได้
   BEGIN
-    UPDATE "user" SET role='district' WHERE id=1;
+    UPDATE users SET role='district' WHERE id=1;
     INSERT INTO case_acceptance (case_id,org_code,accepted_by) VALUES (2,'10676',1);
     ASSERT false, 'ควร reject การรับเคสของบทบาทอำเภอ';
   EXCEPTION WHEN check_violation THEN NULL; END;
-  UPDATE "user" SET role='hospital' WHERE id=1;
+  UPDATE users SET role='hospital' WHERE id=1;
 
   -- user กดยกเลิกรับเคสเอง -> เคสกลับเข้า inbox และ status กลับเป็น reported
   UPDATE case_acceptance SET status='released', released_at=now(), released_by=2,
@@ -178,27 +178,27 @@ BEGIN
 
   -- บัญชีต้องเข้าได้ทางใดทางหนึ่ง (รหัสผ่าน หรือ SSO)
   BEGIN
-    INSERT INTO "user" (username,org_code,role) VALUES ('nologin','10676','hospital');
+    INSERT INTO users (username,org_code,role) VALUES ('nologin','10676','hospital');
     ASSERT false, 'ควร reject บัญชีที่ไม่มีทั้งรหัสผ่านและ SSO';
   EXCEPTION WHEN check_violation THEN NULL; END;
-  INSERT INTO "user" (username,sso_sub,org_code,role) VALUES ('sso1','sub-abc','10676','hospital');
-  ASSERT (SELECT password_hash FROM "user" WHERE username='sso1') IS NULL,
+  INSERT INTO users (username,sso_sub,org_code,role) VALUES ('sso1','sub-abc','10676','hospital');
+  ASSERT (SELECT password_hash FROM users WHERE username='sso1') IS NULL,
          'ผู้ใช้ SSO ไม่ต้องมีรหัสผ่าน';
 
   -- เลขบัตรผู้ใช้ต้องเป็นตัวเลข 13 หลักและห้ามซ้ำ
   BEGIN
-    INSERT INTO "user" (username,sso_sub,cid,org_code,role) VALUES ('badcid','s-bad','12345','10676','hospital');
+    INSERT INTO users (username,sso_sub,cid,org_code,role) VALUES ('badcid','s-bad','12345','10676','hospital');
     ASSERT false, 'ควร reject เลขบัตรที่ไม่ใช่ 13 หลัก';
   EXCEPTION WHEN check_violation THEN NULL; END;
-  INSERT INTO "user" (username,sso_sub,cid,org_code,role) VALUES ('cid1','s-c1','1650100000001','10676','hospital');
+  INSERT INTO users (username,sso_sub,cid,org_code,role) VALUES ('cid1','s-c1','1650100000001','10676','hospital');
   BEGIN
-    INSERT INTO "user" (username,sso_sub,cid,org_code,role) VALUES ('cid2','s-c2','1650100000001','10676','hospital');
+    INSERT INTO users (username,sso_sub,cid,org_code,role) VALUES ('cid2','s-c2','1650100000001','10676','hospital');
     ASSERT false, 'ควร reject เลขบัตรซ้ำ';
   EXCEPTION WHEN unique_violation THEN NULL; END;
 
   -- ผู้ใช้ต้องสังกัดหน่วยงาน
   BEGIN
-    INSERT INTO "user" (username,password_hash,org_code,role) VALUES ('x','h',NULL,'hospital');
+    INSERT INTO users (username,password_hash,org_code,role) VALUES ('x','h',NULL,'hospital');
     ASSERT false, 'ควร reject ผู้ใช้ที่ไม่มีสังกัด';
   EXCEPTION WHEN not_null_violation THEN NULL; END;
 

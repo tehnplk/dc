@@ -107,7 +107,7 @@ async function UsersTab({ q, amp, skip, page, orgOptions, roles }: {
     ...(amp ? { c_org: { area_code: { startsWith: amp } } } : {}),
   }
   const [rows, total] = await Promise.all([
-    prisma.user.findMany({
+    prisma.users.findMany({
       where,
       select: {
         id: true, username: true, full_name: true, position: true, email: true, tel: true,
@@ -118,7 +118,7 @@ async function UsersTab({ q, amp, skip, page, orgOptions, roles }: {
       orderBy: { id: 'asc' },
       skip, take: PAGE_SIZE,
     }),
-    prisma.user.count({ where }),
+    prisma.users.count({ where }),
   ])
 
   return (
@@ -188,7 +188,7 @@ async function OrgsTab({ like, q, amp, skip, page }: {
     prisma.c_org.findMany({
       where,
       select: { code: true, name: true, org_type: true, area_code: true, is_active: true,
-                _count: { select: { user: true } } },
+                _count: { select: { users: true } } },
       orderBy: { code: 'asc' },
       skip, take: PAGE_SIZE,
     }),
@@ -204,7 +204,7 @@ async function OrgsTab({ like, q, amp, skip, page }: {
             <td className={td}>{o.name}</td>
             <td className={`${td} text-fg-muted`}>{o.org_type ?? '—'}</td>
             <td className={`${td} font-mono text-fg-muted`}>{o.area_code ?? '—'}</td>
-            <td className={`${td} text-right font-mono tabular-nums`}>{o._count.user}</td>
+            <td className={`${td} text-right font-mono tabular-nums`}>{o._count.users}</td>
             <td className={td}><Badge on={o.is_active} yes="ใช้งาน" no="ปิด" warn /></td>
             <td className={`${td} text-center`}>
               <RowForm title={`แก้ไข ${o.name}`} trigger="edit" save={saveOrg}

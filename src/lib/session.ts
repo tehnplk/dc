@@ -12,7 +12,7 @@ export async function currentUser() {
   const id = await readSession()
   if (id === null) redirect('/auth/signin')
 
-  const u = await prisma.user.findFirst({
+  const u = await prisma.users.findFirst({
     where: { id, is_active: true, deleted_at: null },
     select: SELECT,
   })

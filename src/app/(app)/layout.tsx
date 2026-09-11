@@ -8,7 +8,7 @@ import { prisma } from "@/lib/db";
  */
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const id = await readSession();
-  const row = id === null ? null : await prisma.user.findFirst({
+  const row = id === null ? null : await prisma.users.findFirst({
     where: { id, is_active: true, deleted_at: null },
     select: { username: true, full_name: true, position: true, email: true, role: true, cid: true,
               tel: true, org_code: true, notify: true, c_org: { select: { name: true } },

@@ -31,7 +31,7 @@ export async function saveProfile(_prev: ProfileState, fd: FormData): Promise<Pr
   if (tel && !/^[0-9\-+() ]{6,20}$/.test(tel)) return { error: 'เบอร์ติดต่อไม่ถูกต้อง' }
 
   try {
-    await prisma.user.update({
+    await prisma.users.update({
       where: { id: me.id },
       data: {
         // ล้างช่องแล้วบันทึก = ตั้งใจลบค่า ต่างจากหน้าตั้งค่าครั้งแรกที่เว้นว่าง = ยังไม่กรอก

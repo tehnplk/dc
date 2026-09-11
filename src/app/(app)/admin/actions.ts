@@ -57,7 +57,7 @@ export async function saveUser(_prev: AdminState, fd: FormData): Promise<AdminSt
   const org = await prisma.c_org.findUnique({ where: { code: org_code }, select: { code: true } })
   if (!org) return { error: 'ไม่พบหน่วยงานที่เลือก' }
 
-  await prisma.user.update({
+  await prisma.users.update({
     where: { id },
     data: { role, is_active, org_code: org.code, tel: text(fd, 'tel') },
   })
@@ -94,7 +94,7 @@ export async function deleteOrg(_prev: AdminState, fd: FormData): Promise<AdminS
   await admin()
   const code = String(fd.get('code'))
   // soft delete: เคสเก่ายังต้องแสดงชื่อหน่วยงานที่แจ้ง/รับได้ ลบจริงแล้วประวัติพัง
-  const users = await prisma.user.count({ where: { org_code: code, deleted_at: null } })
+  const users = await prisma.users.count({ where: { org_code: code, deleted_at: null } })
   if (users > 0) return { error: `ยังมีผู้ใช้ ${users} คนสังกัดหน่วยงานนี้ ย้ายออกก่อน` }
 
   await prisma.c_org.update({ where: { code }, data: { deleted_at: new Date(), is_active: false } })
@@ -165,7 +165,7 @@ export async function deleteUser(_prev: AdminState, fd: FormData): Promise<Admin
   const id = BigInt(String(fd.get('id')))
   if (id === me.id) return { error: 'ลบบัญชีตัวเองไม่ได้' }
 
-  await prisma.user.update({
+  await prisma.users.update({
     where: { id },
     data: { deleted_at: new Date(), is_active: false },
   })

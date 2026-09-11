@@ -23,8 +23,8 @@ const eq = (a: string, b: string) => {
 }
 
 /**
- * ตรวจรหัสกับค่าใน .env แล้วคืน id ของแถวใน user (สร้างให้ถ้ายังไม่มี)
- * ต้องมีแถวจริง เพราะทุกอย่างในระบบอ้างผู้ใช้ด้วย user.id (ผู้แจ้ง/ผู้รับเคส/ผู้บันทึก)
+ * ตรวจรหัสกับค่าใน .env แล้วคืน id ของแถวใน users (สร้างให้ถ้ายังไม่มี)
+ * ต้องมีแถวจริง เพราะทุกอย่างในระบบอ้างผู้ใช้ด้วย users.id (ผู้แจ้ง/ผู้รับเคส/ผู้บันทึก)
  */
 export async function verifySuperUser(username: string, password: string): Promise<bigint | null> {
   if (!superUserEnabled()) return null
@@ -36,7 +36,7 @@ export async function verifySuperUser(username: string, password: string): Promi
   const org = await prisma.c_org.findUnique({ where: { code }, select: { code: true } })
   if (!org) throw new Error(`SUPER_USER_ORG ${code} ไม่มีใน c_org`)
 
-  const user = await prisma.user.upsert({
+  const user = await prisma.users.upsert({
     where: { username: process.env.SUPER_USER! },
     create: {
       username: process.env.SUPER_USER!,

@@ -1,7 +1,7 @@
 -- ข้อมูลตัวอย่างสำหรับ dev: 3 เคส 1 เคสถูกรับแล้วพร้อมกิจกรรม/เอกสาร
 -- smoke_test.sql \i ไฟล์นี้แล้ว rollback / db:seed รันแล้ว commit
 -- identity ไม่ถูก rollback จึงต้อง restart ให้ id คงที่ทุกครั้งที่รัน
-ALTER TABLE "user"        ALTER COLUMN id RESTART WITH 1;
+ALTER TABLE users        ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE c_form_template   ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE case_report     ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE case_acceptance ALTER COLUMN id RESTART WITH 1;
@@ -30,7 +30,7 @@ INSERT INTO hos_village (area_code, org_code) VALUES ('65010101','07476'), ('650
   ON CONFLICT (area_code) DO NOTHING;
 
 -- full_name = ชื่อ-นามสกุลจริงของคน ตำแหน่งแยกไว้ที่ position
-INSERT INTO "user" (username,password_hash,full_name,position,org_code,role) VALUES
+INSERT INTO users (username,password_hash,full_name,position,org_code,role) VALUES
  ('hos01','$argon2id$dummy','สมพงษ์ เวชกิจ','พยาบาลวิชาชีพชำนาญการ','10676','hospital'),
  ('pcu01','$argon2id$dummy','มาลี สุขใจ','นักวิชาการสาธารณสุขชำนาญการ','07476','hospital'),
  ('pcu02','$argon2id$dummy','ประยุทธ ทองดี','เจ้าพนักงานสาธารณสุขชำนาญงาน','07477','hospital'),

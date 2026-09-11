@@ -80,7 +80,7 @@ FROM
       )
       LEFT JOIN c_org ao ON ((ao.code = a.org_code))
     )
-    LEFT JOIN "user" au ON ((au.id = a.accepted_by))
+    LEFT JOIN users au ON ((au.id = a.accepted_by))
   )
 WHERE
   (c.deleted_at IS NULL);

@@ -33,7 +33,7 @@ export async function chooseOrg(_prev: OrgState, fd: FormData): Promise<OrgState
   // เข้ามาซ้ำจากปุ่ม back: มีบัญชีแล้วก็แค่เข้าเลย ไม่สร้างซ้ำ
   let user
   try {
-    user = await prisma.user.upsert({
+    user = await prisma.users.upsert({
       where: { sso_sub: p.sub },
       create: {
         sso_sub: p.sub,
