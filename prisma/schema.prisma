@@ -323,6 +323,23 @@ model users {
   @@index([org_code], map: "users_org_idx")
 }
 
+model c_disease506 {
+  code           String         @id
+  name_en        String?
+  name_th        String
+  icd10          String[]
+  must_report    Boolean        @default(false)
+  report_form_id BigInt?
+  c_report_form  c_report_form? @relation(fields: [report_form_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+model c_report_form {
+  id           BigInt         @id @default(autoincrement())
+  code         String         @unique
+  name         String
+  c_disease506 c_disease506[]
+}
+
 view geography_columns {
   f_table_catalog    Unsupported("name")?
   f_table_schema     Unsupported("name")?

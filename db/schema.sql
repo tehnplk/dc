@@ -70,6 +70,24 @@ CREATE TABLE c_disease (
   is_active                boolean NOT NULL DEFAULT true
 );
 
+-- แบบฟอร์มรายงานที่ใช้แจ้งโรค — โรคหลายโรคใช้แบบเดียวกันได้
+CREATE TABLE c_report_form (
+  id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  code text NOT NULL UNIQUE,
+  name text NOT NULL
+);
+
+-- รายชื่อโรคเฝ้าระวังตามรายงาน 506 ทั้งชุด ใช้เป็น lookup อย่างเดียว ไม่มีค่าตั้งรายโรค
+-- (c_disease คือโรคที่ระบบนี้ดูแลจริง มี SLA/รัศมี/ระยะฟักตัว — คนละหน้าที่กัน)
+CREATE TABLE c_disease506 (
+  code    text PRIMARY KEY,   -- รหัส 506
+  name_en text,
+  name_th text NOT NULL,
+  icd10   text[],
+  must_report boolean NOT NULL DEFAULT false,  -- โรคที่หน่วยบริการต้องแจ้งเข้าระบบนี้
+  report_form_id bigint REFERENCES c_report_form
+);
+
 -- กิจกรรมควบคุมโรค: transmission = NULL คือใช้ได้ทุกโรค
 CREATE TABLE c_activity_type (
   code         text PRIMARY KEY,
@@ -572,12 +590,23 @@ $fn$;
 
 -- ========== 10. Seed ==========
 
+-- icd10 เขียนแบบไม่มีจุด ให้ตรงกับที่ HOSxP เก็บใน icd101.code และ ovstdiag.icd10 (เช่น A910)
+-- A910 = DHF with shock จึงเป็นของ DSS ตัวเดียว ส่วน 26 ได้ A911/A919 กับ A91 ที่ไม่ระบุ
 INSERT INTO c_disease (code,name_th,name_en,icd10,disease_group,transmission,investigate_within_hours,control_radius_m,incubation_min_days,incubation_max_days) VALUES
  ('66','ไข้เดงกี','Dengue fever','{A90}','ไข้เลือดออก','vector',24,100,3,14),
- ('26','ไข้เลือดออก','Dengue hemorrhagic fever','{A91}','ไข้เลือดออก','vector',24,100,3,14),
- ('27','ไข้เลือดออกช็อก','Dengue shock syndrome','{A91}','ไข้เลือดออก','vector',24,100,3,14),
- ('87','ชิคุนกุนยา','Chikungunya','{A92.0}','ไข้เลือดออก','vector',24,100,3,12),
- ('84','ไวรัสซิกา','Zika virus','{A92.5}','ไข้เลือดออก','vector',24,100,3,14)
+ ('26','ไข้เลือดออก','Dengue hemorrhagic fever','{A91,A911,A919}','ไข้เลือดออก','vector',24,100,3,14),
+ ('27','ไข้เลือดออกช็อก','Dengue shock syndrome','{A910}','ไข้เลือดออก','vector',24,100,3,14),
+ ('87','ชิคุนกุนยา','Chikungunya','{A920}','ไข้เลือดออก','vector',24,100,3,12),
+ -- A925 ยังไม่มีใน icd101 ของ HOSxP รุ่นนี้ ใส่ไว้เผื่ออัปเดตชุดรหัส
+ ('84','ไวรัสซิกา','Zika virus','{A925}','ไข้เลือดออก','vector',24,100,3,14)
+ON CONFLICT DO NOTHING;
+
+INSERT INTO c_disease506 (code,name_en,name_th,icd10,must_report) VALUES
+ ('26','Dengue hemorrhagic fever (DHF)','ไข้เลือดออก','{A91,A911,A919}',true),
+ ('27','Dengue shock syndrome (DSS)','ไข้เลือดออกช็อก','{A910}',true),
+ ('66','Dengue fever (DF)','ไข้เดงกี','{A90}',true),
+ ('84','Zika virus','ไวรัสซิกา','{A925}',true),
+ ('87','Chikungunya','ชิคุนกุนยา','{A920}',true)
 ON CONFLICT DO NOTHING;
 
 -- REPORT/ACCEPT เป็นลำดับ 1/2 ที่ v_case_activity สร้างเอง มีไว้ให้รหัสครบเท่านั้น

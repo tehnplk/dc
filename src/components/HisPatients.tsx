@@ -21,9 +21,16 @@ const MSG = {
 
 type Props = { areas: AreaOpt[]; diseases: Disease[]; reporter: string | null; tel: string | null; canReport?: boolean }
 
-/** HIS ส่ง ICD10 มา ระบบเราคีย์ด้วยรหัสโรครายงาน จับคู่ผ่าน c_disease.icd10 */
+/**
+ * HIS ส่ง ICD10 มา ระบบเราคีย์ด้วยรหัสโรครายงาน จับคู่ผ่าน icd10 ของโรคที่เปิด must_report
+ * HOSxP เก็บรหัสแบบไม่มีจุด (icd101.code / ovstdiag.icd10 = A910 ไม่ใช่ A91.0)
+ * ฝั่งเราเก็บแบบเดียวกัน แต่ agent อาจส่งมามีจุด จึงถอดจุดทั้งสองฝั่งก่อนเทียบ
+ * A910 = DHF with shock จึงชี้ 27 ตัวเดียว ส่วน A91 ที่ไม่ระบุตกเป็น 26 ตามที่ควร
+ */
 function toPrefill(p: HisPatient, diseases: Disease[]): Prefill {
-  const d = p.diag_code && diseases.find((x) => x.icd10?.includes(p.diag_code!))
+  const dot = (c: string) => c.replace(/[.\s]/g, '').toUpperCase()
+  const code = p.diag_code && dot(p.diag_code)
+  const d = code && diseases.find((x) => x.icd10?.some((i) => dot(i) === code))
   return {
     cid: p.cid, pname: p.pname, fname: p.fname, lname: p.lname,
     gender: p.gender === 'M' || p.gender === 'F' ? p.gender : undefined,

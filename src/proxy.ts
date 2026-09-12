@@ -51,6 +51,9 @@ export async function proxy(req: NextRequest) {
   }
   if (isPublic(req.nextUrl.pathname)) return NextResponse.next()
 
+  // ตอนพัฒนา ตั้ง DEV_UID ใน .env เพื่อข้าม SSO — readSession() ใช้เงื่อนไขเดียวกัน
+  if (process.env.NODE_ENV !== 'production' && process.env.DEV_UID) return NextResponse.next()
+
   const token = req.cookies.get(SESSION_COOKIE)?.value
   if (token) {
     try {

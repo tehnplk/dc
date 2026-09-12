@@ -5,6 +5,7 @@ import { Bell, CircleAlert, IdCard, Phone, Search, X } from 'lucide-react'
 import { getOrgs, saveProfile, type ProfileState } from '@/app/profile/actions'
 import { chooseOrg } from '@/app/auth/org/actions'
 import { maskCid, validCid } from '@/lib/cid'
+import { TelInput } from './TelInput'
 
 export type Me = {
   cid: string | null
@@ -121,8 +122,7 @@ export function ProfileSettingsModal({ me, open, onClose, mode = 'edit', greetin
           <span className="relative mt-1 block">
             <Phone size={15} strokeWidth={1.75} aria-hidden
                    className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-fg-muted" />
-            <input name="tel" inputMode="tel" defaultValue={me.tel ?? ''} placeholder="08x-xxx-xxxx"
-                   className={`${field} pl-8`} />
+            <TelInput name="tel" defaultValue={me.tel} className={`${field} pl-8`} />
           </span>
         </label>
 

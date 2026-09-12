@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Building2, Home, Users } from 'lucide-react'
+import { Building2, Home, Stethoscope, Users } from 'lucide-react'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
 import { fmtDate } from '@/lib/datetime'
@@ -11,11 +11,12 @@ import { Filters } from '@/components/Filters'
 import { RowForm } from '@/components/admin/RowForm'
 import { AreaFields } from '@/components/admin/AreaFields'
 import { Grid, td } from '@/components/admin/Grid'
+import { MustReportToggle } from '@/components/admin/MustReportToggle'
 import { deleteArea, deleteOrg, deleteUser, saveArea, saveOrg, saveUser } from './actions'
 
 export const dynamic = 'force-dynamic'
 
-type Tab = 'users' | 'orgs' | 'areas'
+type Tab = 'users' | 'orgs' | 'areas' | 'diseases'
 
 export default async function Page({ searchParams }: PageProps<'/admin'>) {
   const me = await currentUser()
@@ -23,7 +24,9 @@ export default async function Page({ searchParams }: PageProps<'/admin'>) {
   if (!me.canManage) redirect(me.role === 'hospital' ? '/hospital/village' : '/patients')
 
   const sp = await searchParams
-  const tab: Tab = sp.tab === 'orgs' ? 'orgs' : sp.tab === 'areas' ? 'areas' : 'users'
+  const tab: Tab = sp.tab === 'orgs' ? 'orgs'
+    : sp.tab === 'areas' ? 'areas'
+    : sp.tab === 'diseases' ? 'diseases' : 'users'
   const page = pageOf(sp.page)
   const q = typeof sp.q === 'string' && sp.q ? sp.q : undefined
   const one = (v: string | string[] | undefined) => (typeof v === 'string' && v ? v : undefined)
@@ -85,11 +88,13 @@ export default async function Page({ searchParams }: PageProps<'/admin'>) {
         <TabLink href="/admin" active={tab === 'users'} Icon={Users} label="จัดการผู้ใช้" />
         <TabLink href="/admin?tab=orgs" active={tab === 'orgs'} Icon={Building2} label="จัดการหน่วยงาน" />
         <TabLink href="/admin?tab=areas" active={tab === 'areas'} Icon={Home} label="จัดการหมู่บ้าน" />
+        <TabLink href="/admin?tab=diseases" active={tab === 'diseases'} Icon={Stethoscope} label="โรคที่ต้องรายงาน" />
       </nav>
 
       {tab === 'users' && <UsersTab q={q} amp={amp} skip={skip} page={page} orgOptions={orgOptions} roles={roles} />}
       {tab === 'orgs' && <OrgsTab like={like} q={q} amp={amp} skip={skip} page={page} />}
       {tab === 'areas' && <AreasTab like={like} q={q} amp={amp} tmb={tmb} skip={skip} page={page} orgs={orgs} />}
+      {tab === 'diseases' && <DiseasesTab q={q} />}
     </main>
   )
 }
@@ -294,6 +299,37 @@ function Badge({ on, yes, no, warn }: { on: boolean; yes: string; no: string; wa
     <span className={`rounded-sm px-1.5 py-0.5 sub font-medium ${on ? 'bg-primary-soft text-primary' : off}`}>
       {on ? yes : no}
     </span>
+  )
+}
+
+// ---------- โรคที่ต้องรายงาน ----------
+async function DiseasesTab({ q }: { q?: string }) {
+  const rows = await prisma.c_disease506.findMany({
+    where: q ? { OR: [{ code: { contains: q } },
+                     { name_th: { contains: q, mode: 'insensitive' } },
+                     { name_en: { contains: q, mode: 'insensitive' } }] } : {},
+    orderBy: { code: 'asc' },
+  })
+
+  return (
+    <>
+      <p className="mb-2 text-xs text-fg-muted">
+        เปิดสวิตช์ = โรคนั้นขึ้นเป็นตัวเลือกในฟอร์มแจ้งเคส
+      </p>
+      <Grid head={['รหัส 506', 'ชื่อโรค', 'ICD10', 'ต้องรายงาน']} empty={rows.length === 0}>
+        {rows.map((d) => (
+          <tr key={d.code} className="border-b border-line last:border-0 odd:bg-surface-2/50 hover:bg-primary-soft">
+            <td className={`${td} font-mono`}>{d.code}</td>
+            <td className={td}>
+              <div className="font-medium">{d.name_th}</div>
+              {d.name_en && <div className="sub text-fg-muted">{d.name_en}</div>}
+            </td>
+            <td className={`${td} font-mono text-fg-muted`}>{d.icd10.join(', ') || '—'}</td>
+            <td className={td}><MustReportToggle code={d.code} on={d.must_report} /></td>
+          </tr>
+        ))}
+      </Grid>
+    </>
   )
 }
 

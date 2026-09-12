@@ -16,3 +16,17 @@ export function pageOf(v: string | string[] | undefined) {
 /** ช่องกรอกมาตรฐานในฟอร์ม — อยู่ที่นี่เพื่อให้ server component import ได้ด้วย */
 export const field =
   'block w-full rounded-sm border border-line bg-surface px-2 py-1.5 text-sm text-fg transition-colors duration-150 hover:border-primary focus:border-primary'
+
+/**
+ * แผงป๊อปอัปควรกางขึ้นบนไหม — วัดกับกล่องที่เลื่อนได้ตัวที่ใกล้ที่สุด (เนื้อโมดัล) ไม่ใช่ขอบจอ
+ * เพราะ absolute ในกล่อง overflow-auto จะโดนตัดที่ขอบกล่องนั้นก่อนเสมอ
+ */
+export function popoverUp(el: HTMLElement | null | undefined, height: number) {
+  if (!el) return false
+  let limit = window.innerHeight
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const o = getComputedStyle(p).overflowY
+    if (o === 'auto' || o === 'scroll') { limit = p.getBoundingClientRect().bottom; break }
+  }
+  return el.getBoundingClientRect().bottom + height > limit
+}

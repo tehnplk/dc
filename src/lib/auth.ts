@@ -31,6 +31,9 @@ export async function createSession(userId: bigint) {
 }
 
 export async function readSession(): Promise<bigint | null> {
+  // ตอนพัฒนา ตั้ง DEV_UID=<id ในตาราง users> ใน .env เพื่อข้าม SSO — บน production ไม่มีผล
+  if (process.env.NODE_ENV !== 'production' && process.env.DEV_UID) return BigInt(process.env.DEV_UID)
+
   const raw = (await cookies()).get(SESSION_COOKIE)?.value
   if (!raw) return null
   try {

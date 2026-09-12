@@ -172,3 +172,27 @@ export async function deleteUser(_prev: AdminState, fd: FormData): Promise<Admin
   revalidatePath('/admin')
   return ok()
 }
+
+// ---------- โรคที่ต้องรายงาน ----------
+
+/**
+ * เปิด/ปิดว่าโรคไหนต้องแจ้งเข้าระบบ — ฟอร์มแจ้งเคสเอาเฉพาะโรคที่เปิดไว้ไปเป็นตัวเลือก
+ * ยังผูกกับ c_disease อยู่ (case_report.disease_code อ้าง FK ไปที่นั่น และ view ก็ JOIN)
+ * เปิดโรคที่ไม่มีแถวใน c_disease จึงต้องกันไว้ ไม่งั้นแจ้งเคสแล้วพังตอนบันทึก
+ */
+export async function toggleMustReport(_prev: AdminState, fd: FormData): Promise<AdminState> {
+  await admin()
+  const code = String(fd.get('code'))
+  const must_report = fd.get('must_report') === 'on'
+
+  const d = await prisma.c_disease506.findUnique({ where: { code }, select: { code: true } })
+  if (!d) return { error: 'ไม่พบโรคนี้' }
+
+  if (must_report && !(await prisma.c_disease.findUnique({ where: { code }, select: { code: true } })))
+    return { error: 'โรคนี้ยังไม่มีค่าตั้งใน c_disease (SLA/รัศมี/ระยะฟักตัว) เปิดให้แจ้งเคสไม่ได้' }
+
+  await prisma.c_disease506.update({ where: { code }, data: { must_report } })
+  revalidatePath('/admin')
+  revalidatePath('/report')
+  return ok()
+}

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ClipboardPlus, Hospital } from 'lucide-react'
+import { ClipboardPlus, Hospital, MessageSquareText } from 'lucide-react'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
 import { CaseTable } from '@/components/CaseTable'
@@ -13,6 +13,8 @@ export const dynamic = 'force-dynamic'
 export default async function Page({ searchParams }: PageProps<'/report'>) {
   const sp = await searchParams
   const his = sp.tab === 'his'          // แท็บอยู่ใน URL จะได้แชร์ลิงก์/กด back ได้
+  const sms = sp.tab === 'sms'
+  const reg = !his && !sms              // แท็บทะเบียนแจ้ง = ค่าตั้งต้น
   const page = pageOf(sp.page)
   const me = await currentUser()
 
@@ -39,8 +41,12 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
       select: { code: true, name: true, level: true },
       orderBy: { code: 'asc' },
     }),
-    // icd10 ไว้ให้แท็บ HIS จับคู่รหัสวินิจฉัยจาก HIS กับโรคในระบบ
-    prisma.c_disease.findMany({ select: { code: true, name_th: true, icd10: true }, orderBy: { code: 'asc' } }),
+    // เฉพาะโรคที่แอดมินเปิด must_report ไว้ — icd10 ไว้ให้แท็บ HIS จับคู่รหัสวินิจฉัยจาก HIS
+    prisma.c_disease506.findMany({
+      where: { must_report: true },
+      select: { code: true, name_th: true, icd10: true },
+      orderBy: { code: 'asc' },
+    }),
   ])
 
   return (
@@ -48,13 +54,13 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
       <header className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
         <h1 className="text-lg font-semibold">ทะเบียนแจ้ง</h1>
         <p className="text-sm text-fg-muted">{me.org.name}</p>
-        {!his && waiting > 0 && (
+        {reg && waiting > 0 && (
           <span className="rounded-sm bg-warn-soft px-2 py-0.5 text-xs font-medium text-warn">
             ยังไม่มีหน่วยรับ {waiting}
           </span>
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
-          {!his && <SearchBox />}
+          {reg && <SearchBox />}
           {/* ไม่มีปุ่มที่กดแล้วถูกปฏิเสธ: บัญชีผู้ดูแลระบบดูอย่างเดียว และ สสอ. แจ้งเคสไม่ได้ */}
           {me.canCase && (
             <ReportCaseModal areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} />
@@ -65,11 +71,17 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
       {/* แท็บเป็น <Link> ล้วน ไม่ต้องมี state ฝั่ง client */}
       <nav className="mb-4 flex gap-1 border-b-2 border-primary">
         <Tab href="/report?tab=his" active={his} Icon={Hospital} label="ผู้ป่วยใน HIS" />
-        <Tab href="/report" active={!his} Icon={ClipboardPlus} label={`ทะเบียนแจ้ง (${all})`} />
+        <Tab href="/report" active={reg} Icon={ClipboardPlus} label={`ทะเบียนแจ้ง (${all})`} />
+        <Tab href="/report?tab=sms" active={sms} Icon={MessageSquareText} label="ทะเบียนส่งข้อความ" />
       </nav>
 
       {his ? (
         <HisPatients areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} canReport={me.canCase} />
+      ) : sms ? (
+        // ponytail: ยังไม่มีตารางข้อความในฐานข้อมูล — ใส่โครงแท็บไว้ก่อน
+        <p className="rounded-sm border border-line bg-surface px-4 py-10 text-center text-sm text-fg-muted">
+          ยังไม่มีข้อความที่ส่ง
+        </p>
       ) : (
         // หน้านี้เป็นทะเบียนของผู้แจ้ง การกดรับเป็นงานฝั่งพื้นที่ ไม่ใช่ที่นี่
         <CaseTable cases={cases} empty="หน่วยงานยังไม่ได้แจ้งเคส"
