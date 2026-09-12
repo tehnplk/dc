@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { GridFontToggle } from './GridFontToggle'
 import { ThemeToggle } from './ThemeToggle'
+import { can } from '@/lib/role'
 import { ProfileSettingsModal, type Me } from './ProfileSettingsModal'
 import { useEffect, useRef, useState } from 'react'
 import {
@@ -103,8 +104,8 @@ export function Sidebar({ user }: { user: User | null }) {
       <ul className="flex flex-col gap-0.5 p-2">
         {(user
           ? [...nav,
-             ...(user.role === 'province' ? [adminNav]
-               : user.role === 'hospital' ? [areaNav] : [])]
+             ...(can.manage(user) ? [adminNav]
+               : can.ownVillages(user) ? [areaNav] : [])]
           // ยังไม่ล็อกอิน: /dashboard เป็นหน้าเดียวที่เปิดสาธารณะ เมนูอื่นกดไปก็โดนเด้ง
           : nav.filter((n) => n.href === '/dashboard')
         ).map(({ href, label, Icon }) => {

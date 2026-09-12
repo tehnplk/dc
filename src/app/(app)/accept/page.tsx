@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can } from '@/lib/role'
 import { Inbox } from 'lucide-react'
 import { CaseTable } from '@/components/CaseTable'
 import { SearchBox } from '@/components/SearchBox'
@@ -59,9 +60,9 @@ export default async function Page({ searchParams }: PageProps<'/accept'>) {
         unit={false}
         addr
         canAdd
-        canEdit={me.role === 'hospital'}
-        canRelease={me.canCase}
-        dischargeOrg={me.role === 'province' ? me.org_code : null}
+        canEdit={can.editActivity(me)}
+        canRelease={can.release(me)}
+        dischargeOrg={can.discharge(me) ? me.org_code : null}
         canAccept={false}
         performer={me.full_name}
         page={page}

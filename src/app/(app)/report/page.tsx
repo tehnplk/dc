@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { ClipboardPlus, Hospital, MessageSquareText } from 'lucide-react'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can, canEditCase } from '@/lib/role'
 import { CaseTable } from '@/components/CaseTable'
 import { PAGE_SIZE, pageOf } from '@/lib/ui'
 import { ReportCaseModal } from '@/components/ReportCaseModal'
@@ -49,6 +50,37 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
     }),
   ])
 
+  // เคสที่ยังแก้ได้มักมีไม่กี่รายการ ดึงข้อมูลเดิมเฉพาะพวกนั้นพอ ไม่ต้องโหลดทั้งหน้า
+  const editableIds = cases.filter((c) => c.id !== null && canEditCase(me, c)).map((c) => c.id!)
+  const editRows = editableIds.length
+    ? await prisma.case_report.findMany({
+        where: { id: { in: editableIds } },
+        select: {
+          id: true, cid: true, hn: true, pname: true, fname: true, lname: true,
+          gender: true, age_y: true, age_m: true, tel: true, area_code: true, addr_no: true,
+          date_onset: true, date_visit: true, date_dx: true, time_dx: true,
+          patient_type: true, disease_code: true, symptom: true,
+          reporter_name: true, reporter_tel: true,
+        },
+      })
+    : []
+  // ฟอร์มรับวันที่เป็น yyyy-mm-dd และเวลาเป็น HH:MM ตามที่ <input>/ThaiDate ใช้
+  const ymd = (d: Date | null) => d?.toISOString().slice(0, 10)
+  const hm = (t: Date | null) => t?.toISOString().slice(11, 16)
+  const edits = {
+    areas, diseases,
+    rows: Object.fromEntries(editRows.map((r) => [String(r.id), {
+      cid: r.cid ?? undefined, hn: r.hn ?? undefined,
+      pname: r.pname ?? undefined, fname: r.fname ?? undefined, lname: r.lname ?? undefined,
+      gender: r.gender ?? undefined, age_y: r.age_y ?? undefined, age_m: r.age_m ?? undefined,
+      tel: r.tel ?? undefined, area_code: r.area_code ?? undefined, addr_no: r.addr_no ?? undefined,
+      date_onset: ymd(r.date_onset), date_visit: ymd(r.date_visit), date_dx: ymd(r.date_dx),
+      time_dx: hm(r.time_dx), patient_type: r.patient_type ?? undefined,
+      disease_code: r.disease_code, symptom: r.symptom ?? undefined,
+      reporter_name: r.reporter_name ?? undefined, reporter_tel: r.reporter_tel ?? undefined,
+    }])),
+  }
+
   return (
     <main className="min-w-0 flex-1 bg-bg p-6">
       <header className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -62,7 +94,7 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {reg && <SearchBox />}
           {/* ไม่มีปุ่มที่กดแล้วถูกปฏิเสธ: บัญชีผู้ดูแลระบบดูอย่างเดียว และ สสอ. แจ้งเคสไม่ได้ */}
-          {me.canCase && (
+          {can.report(me) && (
             <ReportCaseModal areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} />
           )}
         </div>
@@ -76,7 +108,7 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
       </nav>
 
       {his ? (
-        <HisPatients areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} canReport={me.canCase} />
+        <HisPatients areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} canReport={can.report(me)} />
       ) : sms ? (
         // ponytail: ยังไม่มีตารางข้อความในฐานข้อมูล — ใส่โครงแท็บไว้ก่อน
         <p className="rounded-sm border border-line bg-surface px-4 py-10 text-center text-sm text-fg-muted">
@@ -85,7 +117,7 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
       ) : (
         // หน้านี้เป็นทะเบียนของผู้แจ้ง การกดรับเป็นงานฝั่งพื้นที่ ไม่ใช่ที่นี่
         <CaseTable cases={cases} empty="หน่วยงานยังไม่ได้แจ้งเคส"
-                   from={false} addr canAccept={false} page={page} total={total} />
+                   from={false} addr canAccept={false} edits={edits} page={page} total={total} />
       )}
     </main>
   )

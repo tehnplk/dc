@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can } from '@/lib/role'
 
 export type CaseFile = { id: string; name: string | null; path: string }
 
@@ -90,12 +91,12 @@ export async function acceptCase(_prev: AcceptState, fd: FormData): Promise<Acce
   if (typeof caseId !== 'string' || !/^\d{1,18}$/.test(caseId)) return { error: 'เคสไม่ถูกต้อง' }
 
   const me = await currentUser()
-  if (!me.canCase) return { error: 'บทบาทของคุณรับเคสไม่ได้' }
+  if (!can.accept(me)) return { error: 'บทบาทของคุณรับเคสไม่ได้' }
 
   // หน่วยบริการรับได้เฉพาะหมู่บ้านที่ตัวเองรับผิดชอบ (เกณฑ์เดียวกับหน้า "รอรับ" ใน v_case_inbox)
   // แจ้งเองรับเองได้ถ้าหมู่บ้านเป็นของตัวเอง — เป็นขั้นตอนปกติของ รพ.สต.
   // สสจ. ข้ามข้อนี้ เพราะเป็นหน่วยกลางที่ต้องรับเคสตกค้างของทุกพื้นที่ได้
-  if (me.role !== 'province') {
+  if (!can.acceptAnyArea(me)) {
     const c = await prisma.case_report.findFirst({
       where: { id: BigInt(caseId), deleted_at: null },
       select: { area_code: true },

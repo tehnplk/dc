@@ -3,6 +3,7 @@ import { ActivityModal } from './ActivityModal'
 import { AcceptButton } from './AcceptButton'
 import { Pagination } from './Pagination'
 import { DischargeButton } from './DischargeButton'
+import { ReportCaseModal, type AreaOpt, type Disease, type Prefill } from './ReportCaseModal'
 import { ReleaseButton } from './ReleaseButton'
 // ชนิดของแถวในวิว: prisma ตั้งชื่อว่า <model>Model ไม่ใช่ชื่อวิวเปล่า ๆ
 import type { v_case_listModel as v_case_list } from '@/generated/prisma/models/v_case_list'
@@ -27,7 +28,7 @@ function DateTime({ date, time }: { date: Date | null; time: string | null }) {
 // from = คอลัมน์ "จาก" ทะเบียนแจ้งไม่ต้องมี เพราะเป็นหน่วยงานตัวเองทุกแถวอยู่แล้ว
 // canAdd = หน้านั้นให้บันทึกกิจกรรมได้ (ทะเบียนรับ) ไม่ส่ง = ดูได้อย่างเดียว
 export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd, canEdit, addAmp,
-                            canAccept = true, canRelease, dischargeOrg, performer = null, page, total }:
+                            canAccept = true, canRelease, dischargeOrg, edits, performer = null, page, total }:
   { cases: v_case_list[]; empty: string; from?: boolean; unit?: boolean; addr?: boolean
     canAdd?: boolean
     /** แก้/ลบกิจกรรมได้ (ทะเบียนรับของหน่วยบริการ — เคสในนี้คือเคสที่ตัวเองรับไว้) */
@@ -37,6 +38,8 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
     canAccept?: boolean; canRelease?: boolean
     /** รหัสหน่วยงานของ สสจ. — ปุ่มจำหน่ายโผล่เฉพาะเคสที่หน่วยนี้รับไว้เอง */
     dischargeOrg?: string | null
+    /** เคสที่ยังแก้ได้ (คีย์เป็น id) — หน้าเรียกคำนวณด้วย canEditCase แล้วส่งข้อมูลเดิมมาด้วย */
+    edits?: { rows: Record<string, Prefill>; areas: AreaOpt[]; diseases: Disease[] }
     performer?: string | null
     page?: number; total?: number }) {
   return (
@@ -60,13 +63,13 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
             <th className={th}>รับ</th>
             {unit && <th className={th}>หน่วยรับ</th>}
             <th className={`${th} text-center`}>กิจกรรม</th>
-            {(canRelease || dischargeOrg) && <th className={`${th} text-center`}>Action</th>}
+            {(canRelease || dischargeOrg || edits) && <th className={`${th} text-center`}>Action</th>}
           </tr>
         </thead>
         <tbody>
           {cases.length === 0 && (
             <tr>
-              <td colSpan={10 + (from ? 1 : 0) + (unit ? 1 : 0) + (addr ? 1 : 0) + (canRelease || dischargeOrg ? 1 : 0)} className="px-3 py-10 text-center text-fg-muted">{empty}</td>
+              <td colSpan={10 + (from ? 1 : 0) + (unit ? 1 : 0) + (addr ? 1 : 0) + (canRelease || dischargeOrg || edits ? 1 : 0)} className="px-3 py-10 text-center text-fg-muted">{empty}</td>
             </tr>
           )}
           {/* แถบสลับสี: อ่านข้ามคอลัมน์ไม่หลุดบรรทัด — hover ใช้คนละสีจะได้ไม่จมไปกับแถบ */}
@@ -130,9 +133,18 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
                   </div>
                 )}
               </td>
-              {(canRelease || dischargeOrg) && (
+              {(canRelease || dischargeOrg || edits) && (
                 <td className={`${td} text-center`}>
                   <div className="flex justify-center gap-1">
+                    {/* ดินสอโผล่เฉพาะเคสที่ยังอยู่ในหน้าต่างแก้ไขของหน่วยงานตัวเอง */}
+                    {edits?.rows[String(c.id)] && (
+                      <ReportCaseModal
+                        trigger="edit" caseId={String(c.id)} caseNo={c.case_no}
+                        areas={edits.areas} diseases={edits.diseases}
+                        initial={edits.rows[String(c.id)]}
+                        reporter={null} tel={null}
+                      />
+                    )}
                     {/* คืนได้เฉพาะเคสที่ยังถืออยู่ */}
                     {canRelease && c.date_accept && (
                       <ReleaseButton caseId={String(c.id)} caseNo={c.case_no} patient={c.patient_name} />

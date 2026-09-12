@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { Building2, Home, Stethoscope, Users } from 'lucide-react'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can } from '@/lib/role'
 import { fmtDate } from '@/lib/datetime'
 import { PAGE_SIZE, field, pageOf } from '@/lib/ui'
 import { Pagination } from '@/components/Pagination'
@@ -21,7 +22,7 @@ type Tab = 'users' | 'orgs' | 'areas' | 'diseases'
 export default async function Page({ searchParams }: PageProps<'/admin'>) {
   const me = await currentUser()
   // จัดการระบบเป็นของ สสจ./บัญชีสำรอง หน่วยบริการมีหน้าหมู่บ้านของตัวเองแยกต่างหาก
-  if (!me.canManage) redirect(me.role === 'hospital' ? '/hospital/village' : '/patients')
+  if (!can.manage(me)) redirect(can.ownVillages(me) ? '/hospital/village' : '/patients')
 
   const sp = await searchParams
   const tab: Tab = sp.tab === 'orgs' ? 'orgs'

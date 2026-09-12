@@ -3,12 +3,13 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can } from '@/lib/role'
 import type { AdminState } from '@/app/(app)/admin/actions'
 
 /** เฉพาะหน่วยบริการ — สสจ. จัดการพื้นที่รับผิดชอบจาก /admin */
 async function hospital() {
   const me = await currentUser()
-  if (me.role !== 'hospital') throw new Error('forbidden')
+  if (!can.ownVillages(me)) throw new Error('forbidden')
   return me
 }
 

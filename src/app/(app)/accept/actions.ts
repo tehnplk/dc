@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can } from '@/lib/role'
 import { checkFiles, filesOf, saveUpload } from '@/lib/files'
 
 export type ActivityState = { error?: string; ok?: string }
@@ -20,8 +21,9 @@ type Me = Awaited<ReturnType<typeof currentUser>>
  * คืนข้อความเหตุผลถ้าทำไม่ได้ คืน null ถ้าผ่าน
  */
 async function cannotAdd(me: Me, caseId: bigint): Promise<string | null> {
-  if (me.role === 'province') return null
-  if (me.role === 'district') {
+  if (!can.addActivity(me)) return 'บทบาทของคุณบันทึกกิจกรรมไม่ได้'
+  if (can.seeAllAreas(me)) return null
+  if (can.districtScoped(me)) {
     if (!me.amp) return 'บัญชีของคุณยังไม่ได้ผูกกับอำเภอ'
     const inAmp = await prisma.case_report.count({
       where: { id: caseId, deleted_at: null, area_code: { startsWith: me.amp } },
@@ -40,7 +42,7 @@ async function cannotAdd(me: Me, caseId: bigint): Promise<string | null> {
  * จังหวัด/อำเภอ เพิ่มได้อย่างเดียว — ของที่บันทึกไปแล้วเป็นหลักฐานของพื้นที่
  */
 async function ownedActivity(me: Me, activityId: bigint) {
-  if (me.role !== 'hospital') return { error: 'บทบาทของคุณแก้ไข/ลบกิจกรรมไม่ได้' as const }
+  if (!can.editActivity(me)) return { error: 'บทบาทของคุณแก้ไข/ลบกิจกรรมไม่ได้' as const }
 
   const act = await prisma.case_activity.findUnique({
     where: { id: activityId },
@@ -133,7 +135,7 @@ export async function releaseCase(_prev: ReleaseState, fd: FormData): Promise<Re
 
   const me = await currentUser()
   // คืนได้เฉพาะบทบาทที่รับได้ — สสอ. บันทึกกิจกรรมอย่างเดียว ไม่ได้ถือเคส
-  if (!me.canCase) return { error: 'บทบาทของคุณคืนเคสไม่ได้' }
+  if (!can.release(me)) return { error: 'บทบาทของคุณคืนเคสไม่ได้' }
 
   const note = str(fd, 'note')
   if (note && note.length > 255) return { error: 'เหตุผลยาวเกิน 255 ตัวอักษร' }
@@ -213,7 +215,7 @@ export async function dischargeCase(_prev: DischargeState, fd: FormData): Promis
   if (typeof caseId !== 'string' || !/^\d{1,18}$/.test(caseId)) return { error: 'เคสไม่ถูกต้อง' }
 
   const me = await currentUser()
-  if (me.role !== 'province') return { error: 'เฉพาะ สสจ. เท่านั้นที่จำหน่ายเคสได้' }
+  if (!can.discharge(me)) return { error: 'เฉพาะ สสจ. เท่านั้นที่จำหน่ายเคสได้' }
 
   // ต้องรับเคสไว้เองก่อน — กันจำหน่ายเคสที่หน่วยอื่นกำลังทำงานอยู่
   if (!(await prisma.case_acceptance.findFirst({

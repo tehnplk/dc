@@ -1,6 +1,7 @@
 import { prisma } from './db'
+import { can } from './role'
 
-type Me = { canManage: boolean; role: string; amp: string | null; org_code: string }
+type Me = { role: string; amp: string | null; org_code: string }
 
 /**
  * หมู่บ้านที่ผู้ใช้คนนี้ยุ่งได้
@@ -8,8 +9,8 @@ type Me = { canManage: boolean; role: string; amp: string | null; org_code: stri
  * คืน null = ไม่จำกัด
  */
 export async function areaScope(me: Me): Promise<string[] | null> {
-  if (me.canManage) return null
-  if (me.role === 'district') return me.amp ? [me.amp] : []
+  if (can.seeAllAreas(me)) return null
+  if (can.districtScoped(me)) return me.amp ? [me.amp] : []
   const rows = await prisma.hos_village.findMany({
     where: { org_code: me.org_code },
     select: { area_code: true },

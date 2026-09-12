@@ -1,8 +1,8 @@
 'use client'
 
 import { startTransition, useActionState, useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, X } from 'lucide-react'
-import { createCase, type FormState } from '@/app/(app)/report/actions'
+import { Pencil, Plus, X } from 'lucide-react'
+import { createCase, updateCase, type FormState } from '@/app/(app)/report/actions'
 import { maskCid } from '@/lib/cid'
 import { MAX_IMAGES } from '@/lib/upload'
 import { FilePicker } from './FilePicker'
@@ -14,18 +14,25 @@ import { MODAL } from '@/lib/ui'
 export type AreaOpt = { code: string; name: string | null; level: number }
 export type Disease = { code: string; name_th: string; icd10?: string[] }
 
-/** ค่าตั้งต้นของฟอร์ม ใช้ตอนสร้างเคสจากผู้ป่วยใน HIS */
+/** ค่าตั้งต้นของฟอร์ม — ใช้ทั้งตอนสร้างเคสจากผู้ป่วยใน HIS และตอนแก้ไขเคสเดิม */
 export type Prefill = {
-  cid?: string; pname?: string; fname?: string; lname?: string
-  gender?: string; age_y?: number
-  date_onset?: string; date_visit?: string; patient_type?: string; disease_code?: string
+  cid?: string; hn?: string; pname?: string; fname?: string; lname?: string
+  gender?: string; age_y?: number; age_m?: number; tel?: string
+  date_onset?: string; date_visit?: string; date_dx?: string; time_dx?: string
+  patient_type?: string; disease_code?: string
+  area_code?: string; addr_no?: string; symptom?: string
+  reporter_name?: string; reporter_tel?: string
 }
 
 type Props = {
   areas: AreaOpt[]; diseases: Disease[]; reporter: string | null; tel: string | null
   initial?: Prefill
-  /** plus = ปุ่ม + บนหัวหน้า, row = ปุ่มในแถวตาราง */
-  trigger?: 'plus' | 'row'
+  /** plus = ปุ่ม + บนหัวหน้า, row = ปุ่มในแถวตาราง, edit = ดินสอแก้เคสเดิม */
+  trigger?: 'plus' | 'row' | 'edit'
+  /** มีค่า = โหมดแก้ไข ยิงไป updateCase แทน createCase */
+  caseId?: string
+  /** เลขทะเบียนไว้โชว์บนหัวโมดัลตอนแก้ไข */
+  caseNo?: string | null
 }
 
 const field = 'w-full rounded-sm border border-line bg-surface px-2 py-2 text-base text-fg transition-colors duration-150 hover:border-primary focus:border-primary sm:py-1.5 sm:text-sm'
@@ -86,20 +93,21 @@ function Radios({ name, options, defaultValue, span = 1 }: {
   )
 }
 
-export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigger = 'plus' }: Props) {
+export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigger = 'plus', caseId, caseNo }: Props) {
   const dlg = useRef<HTMLDialogElement>(null)
   const [open, setOpen] = useState(false)
   const [dz, setDz] = useState(initial?.disease_code ?? '')
   const [cid, setCid] = useState(maskCid(initial?.cid ?? ''))
   const [visit, setVisit] = useState(initial?.date_visit ?? '')
   // วันวินิจฉัยตามวันรับรักษาให้เอง จนกว่าผู้ใช้จะแก้เอง แล้วค่อยปล่อยอิสระ
-  const [dx, setDx] = useState('')
+  const [dx, setDx] = useState(initial?.date_dx ?? '')
   const [dxEdited, setDxEdited] = useState(false)
-  const [amp, setAmp] = useState('')
-  const [tmb, setTmb] = useState('')
+  // แก้ไขเคสเดิม: ถอดอำเภอ/ตำบลจากรหัสพื้นที่ 8 หลัก ไม่งั้น dropdown ลูกจะว่าง
+  const [amp, setAmp] = useState(initial?.area_code?.slice(0, 4) ?? '')
+  const [tmb, setTmb] = useState(initial?.area_code?.slice(0, 6) ?? '')
   const [imgs, setImgs] = useState<File[]>([])
   const [pdfs, setPdfs] = useState<File[]>([])
-  const [state, submit, pending] = useActionState<FormState, FormData>(createCase, {})
+  const [state, submit, pending] = useActionState<FormState, FormData>(caseId ? updateCase : createCase, {})
 
   useEffect(() => {
     if (open) dlg.current?.showModal()
@@ -129,7 +137,17 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
 
   return (
     <>
-      {trigger === 'plus' ? (
+      {trigger === 'edit' ? (
+        <button
+          type="button"
+          onClick={() => { setImgs([]); setPdfs([]); setOpen(true) }}
+          title={`แก้ไขเคส ${caseNo ?? ''}`}
+          aria-label={`แก้ไขเคส ${caseNo ?? ''}`}
+          className="flex size-8 cursor-pointer items-center justify-center rounded-sm text-fg-muted transition-colors duration-150 hover:bg-surface-2 hover:text-primary"
+        >
+          <Pencil size={16} strokeWidth={1.75} aria-hidden />
+        </button>
+      ) : trigger === 'plus' ? (
         <button
           type="button"
           onClick={() => { setImgs([]); setPdfs([]); setOpen(true) }}
@@ -153,12 +171,14 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
         <dialog
           ref={dlg}
           aria-labelledby="report-title"
-          onClose={(e) => { if (e.target === dlg.current) { setOpen(false); setDz(initial?.disease_code ?? ''); setCid(maskCid(initial?.cid ?? '')); setVisit(initial?.date_visit ?? ''); setDx(''); setDxEdited(false); setAmp(''); setTmb('') } }}
+          onClose={(e) => { if (e.target === dlg.current) { setOpen(false); setDz(initial?.disease_code ?? ''); setCid(maskCid(initial?.cid ?? '')); setVisit(initial?.date_visit ?? ''); setDx(initial?.date_dx ?? ''); setDxEdited(false); setAmp(initial?.area_code?.slice(0, 4) ?? ''); setTmb(initial?.area_code?.slice(0, 6) ?? '') } }}
           onClick={(e) => { if (e.target === dlg.current) dlg.current?.close() }}
           className={MODAL}
         >
           <header className="flex shrink-0 items-center gap-3 border-b border-line px-4 py-3 sm:px-5 sm:py-4">
-            <h2 id="report-title" className="text-base font-semibold">แบบแจ้งเคสเข้าระบบ</h2>
+            <h2 id="report-title" className="text-base font-semibold">
+              {caseId ? `แก้ไขเคส ${caseNo ?? ''}` : 'แบบแจ้งเคสเข้าระบบ'}
+            </h2>
             <button
               type="button"
               onClick={() => dlg.current?.close()}
@@ -170,6 +190,7 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
           </header>
 
           <form onSubmit={send} className="flex min-h-0 flex-1 flex-col">
+            {caseId && <input type="hidden" name="id" value={caseId} />}
             {/* ponytail: ช่องใหม่ (addr_road, exposure, lab_result, vaccine, kin_*, เพศ LGBTQ+,
                 ประเภท "พบในชุมชน") เป็นแค่ layout — createCase ยังไม่อ่าน ต้องเพิ่มคอลัมน์ก่อน */}
             <div className="min-h-0 flex-1 space-y-3 overflow-auto px-4 py-4 sm:px-5">
@@ -197,7 +218,7 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
 
               <Sec title="ข้อมูลผู้ป่วย">
                 <F label="HN" span={3}>
-                  <input name="hn" autoComplete="off" className={`${field} font-mono tracking-wide`} />
+                  <input name="hn" defaultValue={initial?.hn ?? ''} autoComplete="off" className={`${field} font-mono tracking-wide`} />
                 </F>
                 <F label="เลขบัตรประชาชน" span={4}>
                   {/* เก็บเป็นเลขล้วน — ขีดใส่ให้ตอนแสดง แล้วถอดออกฝั่ง server */}
@@ -221,8 +242,8 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
                 </F>
 
                 <F label="อายุ (ปี)" span={2}><input name="age_y" inputMode="numeric" defaultValue={initial?.age_y ?? ''} className={field} /></F>
-                <F label="(เดือน)" span={2}><input name="age_m" inputMode="numeric" className={field} /></F>
-                <F label="โทรศัพท์" span={3}><TelInput name="tel" className={field} /></F>
+                <F label="(เดือน)" span={2}><input name="age_m" inputMode="numeric" defaultValue={initial?.age_m ?? ''} className={field} /></F>
+                <F label="โทรศัพท์" span={3}><TelInput name="tel" defaultValue={initial?.tel} className={field} /></F>
               </Sec>
 
               <Sec title="วันที่">
@@ -239,11 +260,11 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
                     onChange={(v) => { setDx(v); setDxEdited(true) }}
                   />
                 </F>
-                <F label="เวลาวินิจฉัย" span={3}><TimeSelect name="time_dx" className={field} /></F>
+                <F label="เวลาวินิจฉัย" span={3}><TimeSelect name="time_dx" defaultValue={initial?.time_dx} className={field} /></F>
               </Sec>
 
               <Sec title="ที่อยู่ขณะป่วย">
-                <F label="บ้านเลขที่ / สถานที่" span={6}><input name="addr_no" className={field} /></F>
+                <F label="บ้านเลขที่ / สถานที่" span={6}><input name="addr_no" defaultValue={initial?.addr_no ?? ''} className={field} /></F>
                 <F label="ถนน" span={6}><input name="addr_road" className={field} /></F>
 
                 <F label="จังหวัด" span={3}>
@@ -263,7 +284,7 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
                 </F>
                 <F label="หมู่ / หมู่บ้าน / ชุมชน" span={3}>
                   {/* ส่งแค่รหัส 8 หลักตัวเดียว หมู่ที่ถอดจากรหัสฝั่ง server */}
-                  <select name="area_code" defaultValue="" disabled={!tmb} className={field}>
+                  <select name="area_code" defaultValue={initial?.area_code ?? ''} disabled={!tmb} className={field}>
                     <option value="">—</option>
                     {moos.map((a) => <option key={a.code} value={a.code}>{a.name}</option>)}
                   </select>
@@ -275,7 +296,7 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
                   <textarea name="exposure" rows={2} placeholder="เช่น อยู่ร่วมกับผู้ป่วย อยู่ในพื้นที่เสี่ยง" className={area} />
                 </F>
                 <F label="อาการสำคัญและอาการแสดง" span={6}>
-                  <textarea name="symptom" rows={2} className={area} />
+                  <textarea name="symptom" rows={2} defaultValue={initial?.symptom ?? ''} className={area} />
                 </F>
                 <F label="ผลตรวจทางห้องปฏิบัติการ" span={6}>
                   <textarea name="lab_result" rows={2} className={area} />
@@ -309,8 +330,8 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
               </Sec>
 
               <Sec title="ผู้รายงาน">
-                <F label="ชื่อผู้รายงาน" span={5}><input name="reporter_name" defaultValue={reporter ?? ''} className={field} /></F>
-                <F label="โทรศัพท์ผู้รายงาน" span={4}><TelInput name="reporter_tel" defaultValue={tel} className={field} /></F>
+                <F label="ชื่อผู้รายงาน" span={5}><input name="reporter_name" defaultValue={initial?.reporter_name ?? reporter ?? ''} className={field} /></F>
+                <F label="โทรศัพท์ผู้รายงาน" span={4}><TelInput name="reporter_tel" defaultValue={initial?.reporter_tel ?? tel} className={field} /></F>
               </Sec>
             </div>
 
@@ -328,7 +349,7 @@ export function ReportCaseModal({ areas, diseases, reporter, tel, initial, trigg
                 disabled={pending}
                 className="cursor-pointer rounded-sm bg-primary px-4 py-1.5 text-sm font-medium text-bg transition-opacity duration-150 hover:opacity-85 disabled:cursor-wait disabled:opacity-60"
               >
-                {pending ? 'กำลังบันทึก…' : 'บันทึก'}
+                {pending ? 'กำลังบันทึก…' : caseId ? 'บันทึกการแก้ไข' : 'บันทึก'}
               </button>
             </footer>
           </form>

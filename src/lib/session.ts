@@ -26,8 +26,5 @@ export async function currentUser() {
     org: u.c_org,                                   // ชื่อสั้นกว่า ใช้ทั่วแอปเป็น me.org.name
     // อำเภอของหน่วยงานที่สังกัด ใช้จำกัดขอบเขตของ role district
     amp: u.c_org.area_code?.slice(0, 4) ?? null,
-    canManage: u.role === 'province',              // จัดการผู้ใช้/หน่วยงาน/หมู่บ้าน
-    // แจ้งเคส/รับเคสเป็นงานของ สสจ. กับหน่วยบริการ — สสอ. มีหน้าที่บันทึกกิจกรรมอย่างเดียว
-    canCase: u.role === 'province' || u.role === 'hospital',
   }
 }

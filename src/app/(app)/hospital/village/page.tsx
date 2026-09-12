@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can } from '@/lib/role'
 import { areaScope, areaWhere } from '@/lib/scope'
 import { PAGE_SIZE, pageOf } from '@/lib/ui'
 import { Pagination } from '@/components/Pagination'
@@ -17,8 +18,8 @@ export const dynamic = 'force-dynamic'
 export default async function Page({ searchParams }: PageProps<'/hospital/village'>) {
   const me = await currentUser()
   // สสจ./บัญชีสำรองจัดการหมู่บ้านทั้งจังหวัดที่ /admin ส่วน สสอ. ไม่ได้ดูแลหมู่บ้าน
-  if (me.canManage) redirect('/admin?tab=areas')
-  if (me.role !== 'hospital') redirect('/patients')
+  if (can.manage(me)) redirect('/admin?tab=areas')
+  if (!can.ownVillages(me)) redirect('/patients')
 
   const sp = await searchParams
   const page = pageOf(sp.page)

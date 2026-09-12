@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can } from '@/lib/role'
 import { Filters, type Opt } from '@/components/Filters'
 import { CaseTable } from '@/components/CaseTable'
 import { SearchBox } from '@/components/SearchBox'
@@ -69,9 +70,9 @@ export default async function Home({ searchParams }: PageProps<'/patients'>) {
 
       {/* สสจ. บันทึกกิจกรรมได้ทุกเคส · สสอ. เฉพาะอำเภอตัวเอง (server ตรวจซ้ำอีกชั้น) */}
       <CaseTable cases={cases} empty="ไม่มีเคสตามเงื่อนไขที่เลือก" page={page} total={total}
-                 canAccept={me.canCase}
-                 canAdd={me.role === 'province' || me.role === 'district'}
-                 addAmp={me.role === 'district' ? me.amp : null}
+                 canAccept={can.accept(me)}
+                 canAdd={can.addActivity(me)}
+                 addAmp={can.districtScoped(me) ? me.amp : null}
                  performer={me.full_name} />
 
     </main>

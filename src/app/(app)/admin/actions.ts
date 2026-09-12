@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { can } from '@/lib/role'
 import { areaScope, inScope } from '@/lib/scope'
 
 /**
@@ -31,14 +32,14 @@ const text = (fd: FormData, k: string) => {
 /** จัดการผู้ใช้/หน่วยงาน: สสจ. หรือบัญชีสำรองใน .env เท่านั้น */
 async function admin() {
   const me = await currentUser()
-  if (!me.canManage) throw new Error('forbidden')
+  if (!can.manage(me)) throw new Error('forbidden')
   return me
 }
 
 /** จัดการหมู่บ้าน: สสจ. ทั้งจังหวัด + หน่วยบริการเฉพาะเขตตัวเอง (สสอ. ไม่ได้ดูแลหมู่บ้าน) */
 async function areaEditor() {
   const me = await currentUser()
-  if (!me.canManage && me.role !== 'hospital') throw new Error('forbidden')
+  if (!can.manage(me) && !can.ownVillages(me)) throw new Error('forbidden')
   return me
 }
 
@@ -126,7 +127,7 @@ export async function saveArea(_prev: AdminState, fd: FormData): Promise<AdminSt
   try {
     await prisma.c_area.upsert({ where: { code }, create: { code, ...data }, update: data })
     // สสจ. กำหนด/ย้ายหน่วยบริการที่รับผิดชอบได้จากฟอร์มเดียวกัน หน่วยบริการแก้ของตัวเองไม่ได้
-    if (me.canManage && fd.has('org_code')) {
+    if (can.manage(me) && fd.has('org_code')) {
       const org_code = text(fd, 'org_code')
       if (org_code) {
         await prisma.hos_village.upsert({

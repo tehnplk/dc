@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { currentUser } from '@/lib/session'
+import { EDIT_WINDOW_DAYS, can, canEditCase } from '@/lib/role'
 import { checkFiles, filesOf, saveUpload } from '@/lib/files'
 
 export type FormState = { error?: string; ok?: string }
@@ -26,30 +27,66 @@ const date = (fd: FormData, k: string) => {
   return v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T00:00:00Z') : null
 }
 
-export async function createCase(_prev: FormState, fd: FormData): Promise<FormState> {
-  const me = await currentUser()
-  if (!me.canCase) return { error: 'บทบาทของคุณแจ้งเคสไม่ได้' }
-
+/**
+ * ตรวจและแปลงค่าจากฟอร์มเป็นชุดคอลัมน์ — createCase กับ updateCase ใช้ตัวเดียวกัน
+ * กติกาเดียวกันทั้งตอนแจ้งและตอนแก้ ไม่ต้องไล่แก้สองที่
+ */
+async function caseFields(fd: FormData) {
   const disease_code = str(fd, 'disease_code')
   const date_onset = date(fd, 'date_onset')
   const area_code = str(fd, 'area_code')
-  if (!disease_code) return { error: 'เลือกโรคที่วินิจฉัยก่อน' }
+  if (!disease_code) return { error: 'เลือกโรคที่วินิจฉัยก่อน' as const }
   // ฟอร์มโชว์เฉพาะโรคที่เปิด must_report แต่ FormData ปลอมได้ ต้องเช็คซ้ำ
   if (!(await prisma.c_disease506.findFirst({ where: { code: disease_code, must_report: true }, select: { code: true } })))
-    return { error: 'โรคนี้ไม่อยู่ในรายการที่ต้องรายงาน' }
-  if (!date_onset) return { error: 'ระบุวันเริ่มป่วย' }
-  if (area_code && !/^\d{8}$/.test(area_code)) return { error: 'พื้นที่ไม่ถูกต้อง' }
+    return { error: 'โรคนี้ไม่อยู่ในรายการที่ต้องรายงาน' as const }
+  if (!date_onset) return { error: 'ระบุวันเริ่มป่วย' as const }
+  if (area_code && !/^\d{8}$/.test(area_code)) return { error: 'พื้นที่ไม่ถูกต้อง' as const }
 
   const date_visit = date(fd, 'date_visit')
-  if (date_visit && date_visit < date_onset) return { error: 'วันที่พบต้องไม่ก่อนวันเริ่มป่วย' }
-
-  const files = filesOf(fd)
-  const bad = checkFiles(files)
-  if (bad) return { error: bad }
+  if (date_visit && date_visit < date_onset) return { error: 'วันที่พบต้องไม่ก่อนวันเริ่มป่วย' as const }
 
   const gender = str(fd, 'gender')
   const patient_type = str(fd, 'patient_type')
   const time_dx = str(fd, 'time_dx')
+
+  return {
+    data: {
+      disease_code,
+      cid: digits(fd, 'cid'),
+      hn: str(fd, 'hn'),
+      pname: str(fd, 'pname'),
+      fname: str(fd, 'fname'),
+      lname: str(fd, 'lname'),
+      gender: gender === 'M' || gender === 'F' ? gender : null,
+      age_y: int(fd, 'age_y'),
+      age_m: int(fd, 'age_m'),
+      area_code,
+      addr_no: str(fd, 'addr_no'),
+      // หมู่ที่คือ 2 หลักท้ายของรหัสพื้นที่ ไม่ต้องให้คนกรอกซ้ำ (00 = เขตเทศบาล ไม่มีหมู่)
+      moo: area_code && area_code.slice(6) !== '00' ? String(Number(area_code.slice(6))) : null,
+      tel: digits(fd, 'tel'),
+      date_onset,
+      date_visit,
+      date_dx: date(fd, 'date_dx'),
+      time_dx: time_dx && /^\d{2}:\d{2}$/.test(time_dx) ? new Date(`1970-01-01T${time_dx}:00Z`) : null,
+      patient_type: patient_type === 'OPD' || patient_type === 'IPD' ? patient_type : null,
+      symptom: str(fd, 'symptom'),
+      reporter_name: str(fd, 'reporter_name'),
+      reporter_tel: digits(fd, 'reporter_tel'),
+    },
+  }
+}
+
+export async function createCase(_prev: FormState, fd: FormData): Promise<FormState> {
+  const me = await currentUser()
+  if (!can.report(me)) return { error: 'บทบาทของคุณแจ้งเคสไม่ได้' }
+
+  const f = await caseFields(fd)
+  if ('error' in f) return { error: f.error }
+
+  const files = filesOf(fd)
+  const bad = checkFiles(files)
+  if (bad) return { error: bad }
 
   try {
     // เขียนไฟล์ก่อนค่อยลง DB: DB พังเหลือไฟล์กำพร้าที่กวาดทีหลังได้
@@ -58,31 +95,10 @@ export async function createCase(_prev: FormState, fd: FormData): Promise<FormSt
 
     const c = await prisma.case_report.create({
       data: {
-        disease_code,
+        ...f.data,
         case_class: 'suspected',            // แจ้งเข้ามาก่อน ยืนยันผลแลบทีหลัง
-        cid: digits(fd, 'cid'),
-        hn: str(fd, 'hn'),
-        pname: str(fd, 'pname'),
-        fname: str(fd, 'fname'),
-        lname: str(fd, 'lname'),
-        gender: gender === 'M' || gender === 'F' ? gender : null,
-        age_y: int(fd, 'age_y'),
-        age_m: int(fd, 'age_m'),
-        area_code,
-        addr_no: str(fd, 'addr_no'),
-        // หมู่ที่คือ 2 หลักท้ายของรหัสพื้นที่ ไม่ต้องให้คนกรอกซ้ำ (00 = เขตเทศบาล ไม่มีหมู่)
-        moo: area_code && area_code.slice(6) !== '00' ? String(Number(area_code.slice(6))) : null,
-        tel: digits(fd, 'tel'),
-        date_onset,
-        date_visit,
-        date_dx: date(fd, 'date_dx'),
-        time_dx: time_dx && /^\d{2}:\d{2}$/.test(time_dx) ? new Date(`1970-01-01T${time_dx}:00Z`) : null,
-        patient_type: patient_type === 'OPD' || patient_type === 'IPD' ? patient_type : null,
-        symptom: str(fd, 'symptom'),
         report_org_code: me.org_code,
-        reporter_name: str(fd, 'reporter_name'),
         reporter_position: me.position,
-        reporter_tel: digits(fd, 'reporter_tel'),
         created_by: me.id,
         // เอกสารระดับเคส (ไม่ผูกกิจกรรม) — activity_id เว้นว่างไว้
         case_document: saved.length
@@ -100,6 +116,42 @@ export async function createCase(_prev: FormState, fd: FormData): Promise<FormSt
   } catch (e) {
     // CHECK / FK ที่ DB เป็นด่านสุดท้าย ข้อความดิบไม่ควรหลุดไปหน้าเว็บ
     console.error('createCase', e)
+    return { error: 'บันทึกไม่สำเร็จ ตรวจสอบข้อมูลอีกครั้ง' }
+  }
+}
+
+/**
+ * แก้ไขเคสที่หน่วยงานตัวเองแจ้ง ภายในหน้าต่างเวลาที่ role.ts กำหนด
+ * ไม่แตะไฟล์แนบและไม่แตะสถานะ/การรับเคส — แก้ได้เฉพาะข้อมูลผู้ป่วยกับวันที่
+ */
+export async function updateCase(_prev: FormState, fd: FormData): Promise<FormState> {
+  const id = fd.get('id')
+  if (typeof id !== 'string' || !/^\d{1,18}$/.test(id)) return { error: 'เคสไม่ถูกต้อง' }
+
+  const me = await currentUser()
+  const c = await prisma.case_report.findFirst({
+    where: { id: BigInt(id), deleted_at: null },
+    select: { report_org_code: true, date_report: true, time_report: true },
+  })
+  if (!c) return { error: 'ไม่พบเคสนี้' }
+  if (!canEditCase(me, c))
+    return { error: `แก้ได้เฉพาะเคสที่หน่วยงานคุณแจ้ง และภายใน ${EDIT_WINDOW_DAYS} วันนับจากวันที่รายงาน` }
+
+  const f = await caseFields(fd)
+  if ('error' in f) return { error: f.error }
+
+  try {
+    const up = await prisma.case_report.update({
+      where: { id: BigInt(id) },
+      data: { ...f.data, updated_by: me.id },
+      select: { case_no: true },
+    })
+    revalidatePath('/report')
+    revalidatePath('/patients')
+    revalidatePath('/accept')
+    return { ok: `แก้ไขเคส ${up.case_no} แล้ว` }
+  } catch (e) {
+    console.error('updateCase', e)
     return { error: 'บันทึกไม่สำเร็จ ตรวจสอบข้อมูลอีกครั้ง' }
   }
 }
