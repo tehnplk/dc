@@ -7,6 +7,9 @@ import { CaseTable } from '@/components/CaseTable'
 import { PAGE_SIZE, pageOf } from '@/lib/ui'
 import { ReportCaseModal } from '@/components/ReportCaseModal'
 import { SearchBox } from '@/components/SearchBox'
+import { Filters } from '@/components/Filters'
+import { currentEpiYear, epiWhere } from '@/lib/epi'
+import { epiYearOpts } from '@/lib/epi.server'
 import { HisPatients } from '@/components/HisPatients'
 
 export const dynamic = 'force-dynamic'
@@ -20,12 +23,15 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
   const me = await currentUser()
 
   const q = typeof sp.q === 'string' && sp.q ? sp.q : undefined
+  // ทะเบียนเป็นงานประจำวัน ตั้งต้นที่ปีระบาดปัจจุบัน เคสปีก่อน ๆ ยังอยู่ เลือกดูได้
+  const onset = epiWhere(sp.year)
+  const mine = { report_org_code: me.org_code, date_onset: onset }
   const where = {
-    report_org_code: me.org_code,
+    ...mine,
     patient_name: q ? { contains: q, mode: 'insensitive' as const } : undefined,
   }
 
-  const [cases, total, all, waiting, areas, diseases] = await Promise.all([
+  const [cases, total, all, waiting, areas, diseases, years] = await Promise.all([
     // ทะเบียนแจ้ง = เฉพาะเคสที่หน่วยงานตัวเองเป็นคนแจ้ง
     prisma.v_case_list.findMany({
       where,
@@ -35,7 +41,7 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
     }),
     prisma.v_case_list.count({ where }),
     // เลขบนแท็บเป็นยอดทั้งทะเบียน ไม่ใช่ผลการค้น ไม่งั้นตัวเลขวูบตอนพิมพ์ค้นหา
-    prisma.v_case_list.count({ where: { report_org_code: me.org_code } }),
+    prisma.v_case_list.count({ where: mine }),
     prisma.v_case_list.count({ where: { ...where, date_accept: null } }),
     prisma.c_area.findMany({
       where: { level: { in: [2, 3, 4] }, deleted_at: null },
@@ -48,6 +54,7 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
       select: { code: true, name_th: true, icd10: true },
       orderBy: { code: 'asc' },
     }),
+    epiYearOpts(),
   ])
 
   // เคสที่ยังแก้ได้มักมีไม่กี่รายการ ดึงข้อมูลเดิมเฉพาะพวกนั้นพอ ไม่ต้องโหลดทั้งหน้า
@@ -93,6 +100,8 @@ export default async function Page({ searchParams }: PageProps<'/report'>) {
         )}
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {reg && <SearchBox />}
+          {reg && <Filters filters={[{ key: 'year', prompt: 'ปีระบาด', opts: years,
+                                       def: String(currentEpiYear()) }]} />}
           {/* ไม่มีปุ่มที่กดแล้วถูกปฏิเสธ: บัญชีผู้ดูแลระบบดูอย่างเดียว และ สสอ. แจ้งเคสไม่ได้ */}
           {can.report(me) && (
             <ReportCaseModal areas={areas} diseases={diseases} reporter={me.full_name} tel={me.tel} />

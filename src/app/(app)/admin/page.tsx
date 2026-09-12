@@ -11,7 +11,7 @@ import { SearchBox } from '@/components/SearchBox'
 import { Filters } from '@/components/Filters'
 import { RowForm } from '@/components/admin/RowForm'
 import { AreaFields } from '@/components/admin/AreaFields'
-import { Grid, td } from '@/components/admin/Grid'
+import { Grid, NUM, td, tdNum } from '@/components/admin/Grid'
 import { MustReportToggle } from '@/components/admin/MustReportToggle'
 import { deleteArea, deleteOrg, deleteUser, saveArea, saveOrg, saveUser } from './actions'
 
@@ -203,14 +203,15 @@ async function OrgsTab({ like, q, amp, skip, page }: {
 
   return (
     <>
-      <Grid head={['รหัส', 'ชื่อหน่วยงาน', 'ประเภท', 'รหัสพื้นที่', 'ผู้ใช้', 'สถานะ', '']} empty={total === 0}>
+      <Grid head={['รหัส', 'ชื่อหน่วยงาน', 'ประเภท', 'รหัสพื้นที่', 'ผู้ใช้', 'สถานะ', '']}
+            align={['', '', '', '', NUM, '', '']} empty={total === 0}>
         {rows.map((o) => (
           <tr key={o.code} className="border-b border-line last:border-0 odd:bg-surface-2/50 hover:bg-primary-soft">
             <td className={`${td} font-mono`}>{o.code}</td>
             <td className={td}>{o.name}</td>
             <td className={`${td} text-fg-muted`}>{o.org_type ?? '—'}</td>
             <td className={`${td} font-mono text-fg-muted`}>{o.area_code ?? '—'}</td>
-            <td className={`${td} text-right font-mono tabular-nums`}>{o._count.users}</td>
+            <td className={tdNum}>{o._count.users}</td>
             <td className={td}><Badge on={o.is_active} yes="ใช้งาน" no="ปิด" warn /></td>
             <td className={`${td} text-center`}>
               <RowForm title={`แก้ไข ${o.name}`} trigger="edit" save={saveOrg}
@@ -258,14 +259,15 @@ async function AreasTab({ like, q, amp, tmb, skip, page, orgs }: {
 
   return (
     <>
-      <Grid head={['รหัส', 'หมู่บ้าน/ชุมชน', 'ตำบล', 'อำเภอ', 'ประชากร', 'หน่วยรับผิดชอบ', '']} empty={total === 0}>
+      <Grid head={['รหัส', 'หมู่บ้าน/ชุมชน', 'ตำบล', 'อำเภอ', 'ประชากร', 'หน่วยรับผิดชอบ', '']}
+            align={['', '', '', '', NUM, '', '']} empty={total === 0}>
         {rows.map((a) => (
           <tr key={a.code} className="border-b border-line last:border-0 odd:bg-surface-2/50 hover:bg-primary-soft">
             <td className={`${td} font-mono`}>{a.code}</td>
             <td className={td}>{a.name}</td>
             <td className={`${td} text-fg-muted`}>{nameOf.get(a.code.slice(0, 6)) ?? '—'}</td>
             <td className={`${td} text-fg-muted`}>{nameOf.get(a.code.slice(0, 4)) ?? '—'}</td>
-            <td className={`${td} text-right font-mono tabular-nums`}>{a.population ?? '—'}</td>
+            <td className={tdNum}>{a.population ?? '—'}</td>
             <td className={`${td} text-fg-muted`}>
               {a.hos_village ? `${a.hos_village.c_org.code}-${a.hos_village.c_org.name}` : '—'}
             </td>

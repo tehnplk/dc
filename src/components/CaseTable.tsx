@@ -27,7 +27,7 @@ function DateTime({ date, time }: { date: Date | null; time: string | null }) {
 
 // from = คอลัมน์ "จาก" ทะเบียนแจ้งไม่ต้องมี เพราะเป็นหน่วยงานตัวเองทุกแถวอยู่แล้ว
 // canAdd = หน้านั้นให้บันทึกกิจกรรมได้ (ทะเบียนรับ) ไม่ส่ง = ดูได้อย่างเดียว
-export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd, canEdit, addAmp,
+export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd, canEdit, addAmp, addOrg, acts,
                             canAccept = true, canRelease, dischargeOrg, edits, performer = null, page, total }:
   { cases: v_case_list[]; empty: string; from?: boolean; unit?: boolean; addr?: boolean
     canAdd?: boolean
@@ -35,6 +35,10 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
     canEdit?: boolean
     /** จำกัดปุ่มเพิ่มกิจกรรมไว้เฉพาะเคสที่รหัสพื้นที่ขึ้นต้นด้วยค่านี้ (ใช้กับ role district) */
     addAmp?: string | null
+    /** จำกัดปุ่มเพิ่มกิจกรรมไว้เฉพาะเคสที่หน่วยงานนี้รับไว้เอง (ใช้กับ role hospital) */
+    addOrg?: string | null
+    /** จำนวนกิจกรรมต่อเคส (คีย์เป็น id) — ส่งมา = ช่องกิจกรรมเป็น badge ตัวเลขแทนไอคอน */
+    acts?: Record<string, number>
     canAccept?: boolean; canRelease?: boolean
     /** รหัสหน่วยงานของ สสจ. — ปุ่มจำหน่ายโผล่เฉพาะเคสที่หน่วยนี้รับไว้เอง */
     dischargeOrg?: string | null
@@ -52,8 +56,8 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
           <tr className="border-b border-line">
             <th className={`${th} text-right`}>ลำดับ</th>
             {from && <th className={th}>จาก</th>}
-            <th className={th}>พบ</th>
-            <th className={th}>แจ้ง</th>
+            <th className={th}>วันวินิจฉัย</th>
+            <th className={th}>วันแจ้ง</th>
             <th className={th}>ชื่อ-สกุล</th>
             <th className={th}>อำเภอ</th>
             <th className={th}>ตำบล</th>
@@ -63,7 +67,11 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
             <th className={th}>รับ</th>
             {unit && <th className={th}>หน่วยรับ</th>}
             <th className={`${th} text-center`}>กิจกรรม</th>
-            {(canRelease || dischargeOrg || edits) && <th className={`${th} text-center`}>Action</th>}
+            {/* หัวคอลัมน์บอกตามของที่อยู่ในคอลัมน์จริง: ทะเบียนแจ้งมีแต่ดินสอ ทะเบียนรับมีปุ่มคืนเคส
+                (สสจ. มีปุ่มจำหน่ายเพิ่มอีกปุ่มในคอลัมน์เดียวกัน แต่คืนเคสเป็นตัวหลัก) */}
+            {(canRelease || dischargeOrg || edits) && (
+              <th className={`${th} text-center`}>{canRelease || dischargeOrg ? 'คืนเคส' : 'แก้ไข'}</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -126,9 +134,12 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
                       caseId={String(c.id)}
                       caseNo={c.case_no}
                       patient={c.patient_name}
-                      canAdd={canAdd && (!addAmp || (c.area_code ?? '').startsWith(addAmp))}
+                      canAdd={canAdd
+                        && (!addAmp || (c.area_code ?? '').startsWith(addAmp))
+                        && (!addOrg || c.accepted_org_code === addOrg)}
                       canEdit={canEdit}
                       performer={performer}
+                      count={acts && (acts[String(c.id)] ?? 0)}
                     />
                   </div>
                 )}

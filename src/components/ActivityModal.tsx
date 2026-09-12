@@ -11,12 +11,14 @@ import { MODAL } from '@/lib/ui'
 
 // canAdd = หน้านั้นบันทึกกิจกรรมได้ (ทะเบียนรับ) ไม่ใช่ = ดูอย่างเดียว
 // canEdit = หน่วยบริการที่ถือเคสนี้อยู่ แก้/ลบกิจกรรมของตัวเองได้
+// count = จำนวนกิจกรรมที่คนบันทึกเอง (ไม่นับ แจ้งเคส/รับเคส ที่วิวสร้างให้เอง)
+//         ส่งมา = ปุ่มเป็น badge ตัวเลข · ไม่ส่ง = ปุ่มไอคอนแบบเดิม
 type Props = {
   caseId: string; caseNo: string | null; patient: string | null
-  canAdd?: boolean; canEdit?: boolean; performer?: string | null
+  canAdd?: boolean; canEdit?: boolean; performer?: string | null; count?: number
 }
 
-export function ActivityModal({ caseId, caseNo, patient, canAdd, canEdit, performer }: Props) {
+export function ActivityModal({ caseId, caseNo, patient, canAdd, canEdit, performer, count }: Props) {
   const dlg = useRef<HTMLDialogElement>(null)
   const [open, setOpen] = useState(false)
   const [rows, setRows] = useState<Activity[] | null>(null)
@@ -54,18 +56,29 @@ export function ActivityModal({ caseId, caseNo, patient, canAdd, canEdit, perfor
       <button
         type="button"
         onClick={show}
-        title={`กิจกรรมของเคส ${caseNo ?? caseId}`}
+        title={count === undefined
+          ? `กิจกรรมของเคส ${caseNo ?? caseId}`
+          : `กิจกรรมของเคส ${caseNo ?? caseId} — ${count} รายการ`}
         aria-label={`ดูกิจกรรมของเคส ${caseNo ?? caseId}`}
-        className={`flex size-8 cursor-pointer items-center justify-center rounded-sm transition-colors duration-150 ${
-          canAdd
-            ? 'bg-primary-soft text-primary hover:bg-primary hover:text-bg'
-            : 'text-fg-muted hover:bg-surface-2 hover:text-primary'
+        className={`flex cursor-pointer items-center justify-center transition-colors duration-150 ${
+          count !== undefined
+            // badge: สีทึบเมื่อมีกิจกรรมแล้ว จะได้กวาดตาหาเคสที่ยังไม่มีใครลงพื้นที่เจอเร็ว
+            ? `h-7 min-w-7 rounded-full px-2 text-xs font-medium tabular-nums ${
+                count > 0
+                  ? 'bg-primary-soft text-primary hover:bg-primary hover:text-bg'
+                  : 'bg-surface-2 text-fg-muted hover:text-primary'}`
+            : `size-8 rounded-sm ${
+                canAdd
+                  ? 'bg-primary-soft text-primary hover:bg-primary hover:text-bg'
+                  : 'text-fg-muted hover:bg-surface-2 hover:text-primary'}`
         }`}
       >
         {/* หน้าที่บันทึกกิจกรรมได้ ใช้ + สื่อว่ากดแล้วทำอะไรต่อได้ ไม่ใช่แค่เปิดดู */}
-        {canAdd
-          ? <Plus size={16} strokeWidth={2.5} aria-hidden />
-          : <FileText size={16} strokeWidth={1.75} aria-hidden />}
+        {count !== undefined
+          ? count || '—'          // ยังไม่มีกิจกรรม ใช้ขีดเหมือนช่องว่างช่องอื่นในตาราง เลข 0 อ่านแล้วสะดุด
+          : canAdd
+            ? <Plus size={16} strokeWidth={2.5} aria-hidden />
+            : <FileText size={16} strokeWidth={1.75} aria-hidden />}
       </button>
 
       {open && (

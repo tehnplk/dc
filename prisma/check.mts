@@ -13,7 +13,9 @@ eq(df.control_radius_m, 100, 'ค่าปรับรายโรคต้อ�
 // prisma 7 บังคับ orderBy เมื่อใส่ take
 await prisma.v_case_activity.findMany({ take: 1, orderBy: { case_id: 'asc' } })
 const inbox = await prisma.v_case_inbox.findMany({ take: 1, orderBy: { id: 'asc' } })
-if (inbox.length) assert.ok(typeof inbox[0].lat === 'number', 'inbox ต้องส่งพิกัดเป็น lat/lon ไม่ใช่ geometry ดิบ')
+// เคสจากระบบเดิมไม่มีพิกัด lat จึงเป็น null ได้ — ที่ห้ามคือกลายเป็น geometry ดิบ (Buffer/สตริง WKB)
+if (inbox.length) assert.ok(inbox[0].lat === null || typeof inbox[0].lat === 'number',
+  'inbox ต้องส่งพิกัดเป็น lat/lon ไม่ใช่ geometry ดิบ')
 await prisma.v_case_status.findMany({ take: 1, orderBy: { id: 'asc' } })
 await prisma.mv_case_daily.findMany({ take: 1, orderBy: { date_onset: 'asc' } })
 
@@ -43,12 +45,12 @@ eq(await prisma.c_occupation.count(), 15, 'occupation ต้องมี 15 ร�
 
 // lookup ที่ import จาก legacy
 const areas = await prisma.c_area.groupBy({ by: ['level'], _count: true, orderBy: { level: 'asc' } })
-eq(areas.map((a) => [a.level, a._count]), [[1, 1], [2, 10], [3, 93], [4, 1117]],
+eq(areas.map((a) => [a.level, a._count]), [[1, 1], [2, 9], [3, 93], [4, 1117]],
   'c_area ต้องมีครบ 4 ชั้น (จว./อำเภอ/ตำบล/หมู่บ้าน) จาก legacy')
 assert.ok(await prisma.c_org.count() >= 212, 'c_org ต้องมีสถานพยาบาลจาก legacy')
 eq((await prisma.c_org.findUniqueOrThrow({ where: { code: '10676' } })).name, 'รพ.พุทธชินราช',
   'chospital เป็น tis620 — ถ้าเพี้ยนแปลว่า CONVERT ใน import_legacy.mjs หลุด')
-assert.ok(await prisma.c_org_area.count() >= 1299, 'c_org_area ต้องมีพื้นที่รับผิดชอบจาก legacy')
+assert.ok(await prisma.hos_village.count() >= 1117, 'hos_village ต้องมีพื้นที่รับผิดชอบจาก legacy')
 eq((await prisma.c_area.findUniqueOrThrow({ where: { code: '6501' } })).name, 'เมืองพิษณุโลก',
   'ภาษาไทยต้องไม่เพี้ยนตอน import')
 

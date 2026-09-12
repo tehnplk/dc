@@ -17,7 +17,7 @@ import {
   LogIn,
   LogOut,
   Settings,
-  Inbox,
+  FileText,
   PanelLeftClose,
   PanelLeftOpen,
   Users,
@@ -27,11 +27,11 @@ const nav = [
   { href: '/dashboard', label: 'แดชบอร์ด', Icon: ChartColumnBig },
   { href: '/patients', label: 'ผู้ป่วยทั้งหมด', Icon: Users },
   { href: '/report', label: 'ทะเบียนแจ้ง', Icon: ClipboardPlus },
-  { href: '/accept', label: 'ทะเบียนรับ', Icon: Inbox },
+  { href: '/accept', label: 'ทะเบียนรับ', Icon: FileText },
 ] as const
 
 const adminNav = { href: '/admin', label: 'ผู้ดูแลระบบ', Icon: ShieldIcon } as const
-const areaNav = { href: '/hospital/village', label: 'หมู่บ้านรับผิดชอบ', Icon: Home } as const
+const areaNav = { href: '/hospital/village', label: 'หมู่บ้าน', Icon: Home } as const
 
 type User = {
   name: string | null

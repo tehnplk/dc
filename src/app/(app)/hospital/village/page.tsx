@@ -9,7 +9,7 @@ import { SearchBox } from '@/components/SearchBox'
 import { RowForm } from '@/components/admin/RowForm'
 import { NameAndPopulation } from '@/components/admin/AreaFields'
 import { VillagePicker } from '@/components/admin/VillagePicker'
-import { Grid, td } from '@/components/admin/Grid'
+import { Grid, NUM, td, tdNum } from '@/components/admin/Grid'
 import { saveArea } from '@/app/(app)/admin/actions'
 import { claimVillage, releaseVillage } from './actions'
 
@@ -63,18 +63,19 @@ export default async function Page({ searchParams }: PageProps<'/hospital/villag
         </div>
       </header>
 
-      <Grid head={['รหัส', 'หมู่ที่', 'หมู่บ้าน/ชุมชน', 'ตำบล', 'อำเภอ', 'ประชากร', 'Action']}
+      <Grid head={['รหัส', 'หมู่ที่', 'หมู่บ้าน/ชุมชน', 'ตำบล', 'อำเภอ', 'ประชากร', 'แก้ไข']}
+            align={['', NUM, '', '', '', NUM, NUM]}
             empty={total === 0}
             emptyText="ยังไม่มีหมู่บ้านในความรับผิดชอบ แจ้ง สสจ. เพื่อกำหนดพื้นที่">
         {rows.map((a) => (
           <tr key={a.code} className="border-b border-line last:border-0 odd:bg-surface-2/50 hover:bg-primary-soft">
             <td className={`${td} font-mono`}>{a.code}</td>
             {/* 2 หลักท้ายของรหัสหมู่บ้านคือหมู่ที่ ไม่มีคอลัมน์แยกในฐานข้อมูล */}
-            <td className={`${td} text-right font-mono tabular-nums`}>{Number(a.code.slice(6)) || '—'}</td>
+            <td className={tdNum}>{Number(a.code.slice(6)) || '—'}</td>
             <td className={td}>{a.name}</td>
             <td className={`${td} text-fg-muted`}>{nameOf.get(a.code.slice(0, 6)) ?? '—'}</td>
             <td className={`${td} text-fg-muted`}>{nameOf.get(a.code.slice(0, 4)) ?? '—'}</td>
-            <td className={`${td} text-right font-mono tabular-nums`}>{a.population ?? '—'}</td>
+            <td className={tdNum}>{a.population ?? '—'}</td>
             <td className={`${td} text-center`}>
               <RowForm title={`แก้ไข ${a.name}`} trigger="edit" save={saveArea}
                        remove={releaseVillage} removeKey={{ name: 'code', value: a.code }}

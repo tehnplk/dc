@@ -38,6 +38,12 @@ export const can = {
   /** บันทึกกิจกรรมควบคุมโรค — สสอ. มีหน้าที่นี้อย่างเดียว */
   addActivity: (me: Actor) => is(me, 'province', 'district', 'hospital'),
 
+  /**
+   * บันทึกกิจกรรมได้เฉพาะเคสที่หน่วยงานตัวเองรับไว้
+   * (สสจ. ทำได้ทุกเคส · สสอ. ได้ทั้งอำเภอตัวเอง — ดู cannotAdd() ใน accept/actions.ts)
+   */
+  activityOwnedOnly: (me: Actor) => is(me, 'hospital'),
+
   /** แก้/ลบกิจกรรม — เฉพาะหน่วยที่ถือเคส ของที่ สสจ./สสอ. บันทึกไว้เป็นหลักฐานของพื้นที่ */
   editActivity: (me: Actor) => is(me, 'hospital'),
 

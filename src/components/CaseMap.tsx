@@ -32,9 +32,11 @@ export function CaseMap({ cases }: { cases: MapCase[] }) {
       if (dead || !box.current) return
 
       map = L.map(box.current, { scrollWheelZoom: true }).setView([16.82, 100.26], 10)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        attribution: '&copy; OpenStreetMap',
+        // OSM requires a Referer; send only the origin, never case URLs or query strings.
+        referrerPolicy: 'strict-origin',
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(map)
 
       // CircleMarker ไม่ต้องใช้ไฟล์ไอคอน เลยไม่เจอปัญหา marker รูปแตกของ leaflet ใน bundler

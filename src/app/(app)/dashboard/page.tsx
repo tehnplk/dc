@@ -1,7 +1,8 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/db'
 import { Activity, ChartColumnBig, CircleCheck, Clock, Inbox, Map as MapIcon, TriangleAlert } from 'lucide-react'
-import { EpiCurve } from '@/components/EpiCurve'
+import { EpiCurve, type EpiYear } from '@/components/EpiCurve'
+import { COMPARE_YEARS, currentEpiWeek, currentEpiYear, toBE } from '@/lib/epi'
 import { BarList } from '@/components/BarList'
 import { CaseMap, type MapCase } from '@/components/CaseMap'
 
@@ -11,7 +12,7 @@ type Kpi = {
   cases: bigint; waiting: bigint; accepted: bigint; closed: bigint
   in_time: bigint; investigated: bigint; last7: bigint; prev7: bigint
 }
-type Week = { wk: Date; cases: bigint }
+type Week = { yr: number; wk: number; cases: number }
 type Row = { label: string | null; cases: bigint; extra: bigint | null }
 
 const n = (v: bigint | null | undefined) => Number(v ?? 0)
@@ -19,6 +20,8 @@ const pct = (a: number, b: number) => (b === 0 ? 0 : Math.round((a / b) * 100))
 
 export default async function Page({ searchParams }: PageProps<'/dashboard'>) {
   const gis = (await searchParams).tab === 'gis'
+  const thisYear = currentEpiYear()
+  const firstYear = thisYear - COMPARE_YEARS + 1
 
   // แท็บแผนที่ไม่ต้องใช้ตัวเลขรวม ยิงคนละ query ไปเลย ไม่ต้องคิดทั้งสองชุดทุกครั้ง
   if (gis) {
@@ -63,14 +66,17 @@ export default async function Page({ searchParams }: PageProps<'/dashboard'>) {
                            AND s.date_report >  current_date - 14)   AS prev7
       FROM v_case_status s`,
 
-    // เส้นโค้งระบาด 16 สัปดาห์ นับตามวันเริ่มป่วย ไม่ใช่วันรายงาน
+    // เส้นโค้งระบาดเทียบ 3 ปีระบาดล่าสุด นับตามวันเริ่มป่วย ไม่ใช่วันรายงาน
+    // สูตรสัปดาห์ต้องตรงกับ epiWeek() ใน lib/epi.ts (ตัดทุก 7 วันจาก 1 ม.ค.)
     prisma.$queryRaw<Week[]>`
-      SELECT w.wk::date AS wk, count(c.id) AS cases
-      FROM generate_series(date_trunc('week', current_date) - interval '15 week',
-                           date_trunc('week', current_date), interval '1 week') w(wk)
-      LEFT JOIN case_report c
-        ON c.deleted_at IS NULL AND date_trunc('week', c.date_onset) = w.wk
-      GROUP BY 1 ORDER BY 1`,
+      SELECT extract(year from date_onset)::int AS yr,
+             least((extract(doy from date_onset)::int - 1) / 7 + 1, 52)::int AS wk,
+             count(*)::int AS cases
+      FROM case_report
+      WHERE deleted_at IS NULL
+        AND date_onset >= make_date(${firstYear}, 1, 1)
+        AND date_onset <  make_date(${thisYear + 1}, 1, 1)
+      GROUP BY 1, 2`,
 
     // อัตราป่วยต่อแสนประชากร ใช้ประชากรของอำเภอที่ import มา
     prisma.$queryRaw<Row[]>`
@@ -102,6 +108,22 @@ export default async function Page({ searchParams }: PageProps<'/dashboard'>) {
   const cases = n(k?.cases)
   const trend = n(k?.last7) - n(k?.prev7)
 
+  // กาง 52 ช่องให้ครบทุกปี สัปดาห์ที่ไม่มีเคส = 0 ไม่ใช่ช่องว่าง
+  // ปีปัจจุบันตัดที่สัปดาห์ล่าสุด ไม่งั้นเส้นดิ่งเป็น 0 ยาวไปจนสิ้นปี เหมือนโรคหายไปแล้ว
+  const thisWeek = currentEpiWeek()
+  const curve: EpiYear[] = Array.from({ length: COMPARE_YEARS }, (_, i) => {
+    const year = thisYear - i
+    return {
+      year,
+      cases: Array.from({ length: 52 }, (_, w) =>
+        year === thisYear && w + 1 > thisWeek ? null : 0),
+    }
+  })
+  for (const r of weeks) {
+    const line = curve.find((c) => c.year === r.yr)
+    if (line) line.cases[r.wk - 1] = r.cases
+  }
+
   return (
     <main className="min-w-0 flex-1 bg-bg p-6">
       <Head />
@@ -120,8 +142,10 @@ export default async function Page({ searchParams }: PageProps<'/dashboard'>) {
       </div>
 
       <section className="mt-4 rounded-sm border border-line bg-surface p-4">
-        <h2 className="mb-3 text-sm font-semibold">เส้นโค้งการระบาด · 16 สัปดาห์ (ตามวันเริ่มป่วย)</h2>
-        <EpiCurve data={weeks.map((w) => ({ wk: w.wk.toISOString(), cases: n(w.cases) }))} />
+        <h2 className="mb-3 text-sm font-semibold">
+          เส้นโค้งการระบาด · เทียบรายสัปดาห์ ปี {toBE(firstYear)}–{toBE(thisYear)} (ตามวันเริ่มป่วย)
+        </h2>
+        <EpiCurve years={curve} />
       </section>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

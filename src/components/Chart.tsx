@@ -17,7 +17,7 @@ ChartJS.register(
 function themeColors() {
   const s = getComputedStyle(document.documentElement)
   const v = (name: string) => s.getPropertyValue(name).trim()
-  return { primary: v('--primary'), line: v('--line'), muted: v('--fg-muted') }
+  return { primary: v('--primary'), line: v('--line'), muted: v('--fg-muted'), warn: v('--warn') }
 }
 
 // generic ตามชนิดกราฟ ไม่งั้น callback ของ tooltip จะถูกมองเป็นชนิดรวมของทุกกราฟ

@@ -122,7 +122,7 @@ export function HisPatients({ areas, diseases, reporter, tel, canReport = true }
               <th className={th}>วันรับรักษา</th>
               <th className={th}>วินิจฉัย</th>
               <th className={th}>ประเภท</th>
-              <th className={`${th} text-center`}>Action</th>
+              <th className={`${th} text-center`}>แจ้งเคส</th>
             </tr>
           </thead>
           <tbody>

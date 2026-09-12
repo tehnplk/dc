@@ -16,7 +16,8 @@
     "db:import": "node db/import_legacy.mjs",
     "db:import:icd10": "node db/import_icd10.mjs",
     "db:import:icd10:my": "node db/import_icd10_mysql.mjs",
-    "test": "tsx --test src/**/*.test.mts"
+    "test": "tsx --test src/**/*.test.mts",
+    "db:migrate": "node db/migrate_legacy.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",

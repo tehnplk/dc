@@ -332,7 +332,8 @@ CREATE TABLE case_activity (
   activity_name text     CHECK (length(activity_name) <= 255),
   performer     text,                                    -- ผู้ดำเนินการ (คน/ทีม/อสม./หน่วยงาน)
   performer_org text REFERENCES c_org,                     -- หน่วยงานผู้ดำเนินการ ถ้าระบุได้
-  note          text     CHECK (length(note) <= 1000),   -- รายละเอียด
+  -- รายละเอียด — ไม่จำกัดความยาว บันทึกสอบสวนของจริงจากระบบเดิมยาวถึงหมื่นตัวอักษร
+  note          text,
   created_at timestamptz NOT NULL DEFAULT now(),         -- ใครบันทึกคือ created_by (คนละคนกับผู้ดำเนินการได้)
   created_by bigint REFERENCES users,
   updated_at timestamptz NOT NULL DEFAULT now(),
