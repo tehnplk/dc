@@ -53,7 +53,10 @@ console.log('นำเข้าจาก legacy (mosquito) ->')
 
 // ---- 1. พื้นที่: จังหวัด > อำเภอ > ตำบล > หมู่บ้าน (ต้องเรียงตามชั้น FK จะได้ไม่หลุด)
 const PROV = { '65': 'พิษณุโลก' }
+// legacy ยัด "(ส่งกลับ)สสจ." เป็นอำเภอปลอมรหัส xx00 ไว้เป็นที่ทิ้งเคสที่ไม่มีเจ้าของ
+// ระบบใหม่ไม่ใช้ท่านี้ (คืนเคสมี case_acceptance.status='released' อยู่แล้ว) กรองทิ้งตั้งแต่นำเข้า
 const amps = rows('camp', `'code',code,'name',${t('name')},'population',POP`)
+  .filter((a) => !a.code.endsWith('00'))
 const provCodes = [...new Set(amps.map((a) => a.code.slice(0, 2)))]
 await upsert('c_area', ['code', 'level', 'name', 'parent_code', 'population'], 'code',
   ['name'], provCodes.map((code) => ({ code, level: 1, name: PROV[code] ?? code, parent_code: null, population: null })))
@@ -101,10 +104,10 @@ await upsert('hos_village', ['area_code', 'org_code'], 'area_code', ['org_code']
 await upsert('c_occupation', ['code', 'name'], 'code', ['name'],
   rows('coccupat', `'code',code,'name',${t('name')}`))
 
-// ---- 5. โรค: legacy มีแค่รหัส+ชื่อ ค่าตั้งทางระบาดวิทยาที่ seed ไว้ (รัศมี/ระยะฟักตัว) ต้องไม่ถูกทับ
+// ---- 5. โรค: legacy มีแค่รหัส+ชื่อ ค่าตั้งทางระบาดวิทยาที่ seed ไว้ (รัศมี/ระยะฟักตัว/must_report) ต้องไม่ถูกทับ
 // name_th อยู่ใน update list ไม่ได้ ไม่งั้นชื่อไทยที่ seed ไว้จะถูกทับด้วยชื่ออังกฤษ
 // แต่ต้องส่งค่ามาด้วย เพราะ ON CONFLICT ยังเช็ก NOT NULL ของ tuple ที่จะ insert ก่อนเสมอ
-await upsert('c_disease', ['code', 'name_th', 'name_en'], 'code', ['name_en'],
+await upsert('c_disease506', ['code', 'name_th', 'name_en'], 'code', ['name_en'],
   rows('cdx', `'code',code,'name_en',${t('name')}`).map((x) => ({ ...x, name_th: x.name_en })))
 
 const [{ count }] = (await db.query('SELECT count(*)::int FROM c_area')).rows

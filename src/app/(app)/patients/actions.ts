@@ -91,6 +91,22 @@ export async function acceptCase(_prev: AcceptState, fd: FormData): Promise<Acce
 
   const me = await currentUser()
   if (!me.canCase) return { error: 'บทบาทของคุณรับเคสไม่ได้' }
+
+  // หน่วยบริการรับได้เฉพาะหมู่บ้านที่ตัวเองรับผิดชอบ (เกณฑ์เดียวกับหน้า "รอรับ" ใน v_case_inbox)
+  // แจ้งเองรับเองได้ถ้าหมู่บ้านเป็นของตัวเอง — เป็นขั้นตอนปกติของ รพ.สต.
+  // สสจ. ข้ามข้อนี้ เพราะเป็นหน่วยกลางที่ต้องรับเคสตกค้างของทุกพื้นที่ได้
+  if (me.role !== 'province') {
+    const c = await prisma.case_report.findFirst({
+      where: { id: BigInt(caseId), deleted_at: null },
+      select: { area_code: true },
+    })
+    if (!c) return { error: 'ไม่พบเคสนี้' }
+    if (!c.area_code || !(await prisma.hos_village.findFirst({
+          where: { area_code: c.area_code, org_code: me.org_code }, select: { area_code: true },
+        })))
+      return { error: 'เคสนี้ไม่ได้อยู่ในหมู่บ้านที่หน่วยงานคุณรับผิดชอบ' }
+  }
+
   try {
     // วัน/เวลารับ ปล่อยให้ DEFAULT ของ DB ลง (เวลาไทย) ไม่ใช่นาฬิกาของ node
     await prisma.case_acceptance.create({

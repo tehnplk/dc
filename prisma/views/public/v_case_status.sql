@@ -55,7 +55,7 @@ FROM
   (
     (
       case_report c
-      JOIN c_disease d ON ((d.code = c.disease_code))
+      JOIN c_disease506 d ON ((d.code = c.disease_code))
     )
     LEFT JOIN case_acceptance a ON (
       (

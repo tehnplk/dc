@@ -1,5 +1,5 @@
 -- ระบบเฝ้าระวังทางระบาดวิทยา (รง.506/507) — PostGIS
--- รองรับโรคที่ต้องรายงานทุกโรค: ส่วนที่ต่างกันรายโรคเก็บใน jsonb + ตั้งค่าใน c_disease
+-- รองรับโรคที่ต้องรายงานทุกโรค: ส่วนที่ต่างกันรายโรคเก็บใน jsonb + ตั้งค่าใน c_disease506
 
 CREATE EXTENSION IF NOT EXISTS postgis;
 
@@ -55,21 +55,6 @@ CREATE TABLE c_occupation (
   name text NOT NULL
 );
 
--- ตัวโรค + "ปุ่มปรับ" เชิงระบาดวิทยาที่ทำให้ระบบใช้ได้กับทุกโรคโดยไม่ต้องแก้โค้ด
-CREATE TABLE c_disease (
-  code                     text PRIMARY KEY,   -- รหัส 506
-  name_th                  text NOT NULL,
-  name_en                  text,
-  icd10                    text[],
-  disease_group            text,              -- ไข้เลือดออก/อาหารและน้ำ/ทางเดินหายใจ/สัตว์สู่คน...
-  transmission             text,              -- vector|foodborne|airborne|contact|zoonotic|bloodborne
-  investigate_within_hours int,               -- SLA สอบสวน (SRRT = 24)
-  control_radius_m         int,               -- รัศมีควบคุมโรครอบบ้านผู้ป่วย (DHF = 100)
-  incubation_min_days      int,
-  incubation_max_days      int,
-  is_active                boolean NOT NULL DEFAULT true
-);
-
 -- แบบฟอร์มรายงานที่ใช้แจ้งโรค — โรคหลายโรคใช้แบบเดียวกันได้
 CREATE TABLE c_report_form (
   id   bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -77,16 +62,33 @@ CREATE TABLE c_report_form (
   name text NOT NULL
 );
 
--- รายชื่อโรคเฝ้าระวังตามรายงาน 506 ทั้งชุด ใช้เป็น lookup อย่างเดียว ไม่มีค่าตั้งรายโรค
--- (c_disease คือโรคที่ระบบนี้ดูแลจริง มี SLA/รัศมี/ระยะฟักตัว — คนละหน้าที่กัน)
+-- รายชื่อโรคเฝ้าระวังตามรายงาน 506 + "ปุ่มปรับ" เชิงระบาดวิทยารายโรค
+-- ทำให้ระบบใช้ได้กับทุกโรคโดยไม่ต้องแก้โค้ด
 CREATE TABLE c_disease506 (
-  code    text PRIMARY KEY,   -- รหัส 506
-  name_en text,
-  name_th text NOT NULL,
-  icd10   text[],
-  must_report boolean NOT NULL DEFAULT false,  -- โรคที่หน่วยบริการต้องแจ้งเข้าระบบนี้
-  report_form_id bigint REFERENCES c_report_form
+  code                     text PRIMARY KEY,   -- รหัส 506
+  name_th                  text NOT NULL,
+  name_en                  text,
+  icd10                    text[],             -- ไม่มีจุด ให้ตรงกับ HOSxP (A910 ไม่ใช่ A91.0)
+  must_report              boolean NOT NULL DEFAULT false,  -- ขึ้นเป็นตัวเลือกในฟอร์มแจ้งเคสไหม
+  report_form_id           bigint REFERENCES c_report_form,
+  disease_group            text,               -- ไข้เลือดออก/อาหารและน้ำ/ทางเดินหายใจ/สัตว์สู่คน...
+  transmission             text,               -- vector|foodborne|airborne|contact|zoonotic|bloodborne
+  investigate_within_hours int,                -- SLA สอบสวน (SRRT = 24)
+  control_radius_m         int,                -- รัศมีควบคุมโรครอบบ้านผู้ป่วย (DHF = 100)
+  incubation_min_days      int,
+  incubation_max_days      int,
+  is_active                boolean NOT NULL DEFAULT true
 );
+
+-- ชุดรหัส ICD-10 ดึงมาจาก icd101 ของ HOSxP (npm run db:import:icd10)
+-- code ไม่มีจุด ตามที่ HOSxP เก็บ (A910 ไม่ใช่ A91.0) ให้ตรงกับ c_disease506.icd10
+CREATE TABLE c_icd10 (
+  code  text PRIMARY KEY,
+  name  text,              -- ชื่ออังกฤษ
+  tname text,              -- ชื่อไทย (มีไม่ครบทุกรหัส)
+  code3 text               -- 3 หลักแรก ใช้จัดกลุ่ม
+);
+CREATE INDEX c_icd10_code3_idx ON c_icd10 (code3);
 
 -- กิจกรรมควบคุมโรค: transmission = NULL คือใช้ได้ทุกโรค
 CREATE TABLE c_activity_type (
@@ -102,7 +104,7 @@ CREATE TABLE c_form_template (
   code         text NOT NULL,
   version      int  NOT NULL DEFAULT 1,
   name         text NOT NULL,
-  disease_code text REFERENCES c_disease,      -- NULL = ใช้ได้ทุกโรค
+  disease_code text REFERENCES c_disease506,      -- NULL = ใช้ได้ทุกโรค
   schema       jsonb NOT NULL,
   is_active    boolean NOT NULL DEFAULT true,
   UNIQUE (code, version)
@@ -161,7 +163,7 @@ CREATE TABLE case_report (
   case_no      text UNIQUE                              -- 65-2026-000123
                DEFAULT '65-' || to_char(now() AT TIME ZONE 'Asia/Bangkok', 'YYYY')
                        || '-' || lpad(nextval('case_no_seq')::text, 6, '0'),
-  disease_code text NOT NULL REFERENCES c_disease,
+  disease_code text NOT NULL REFERENCES c_disease506,
   -- reported = ยังไม่มีหน่วยไหนกดรับ (คืนเคสแล้วก็กลับมาสถานะนี้)
   status       text NOT NULL DEFAULT 'reported'
                CHECK (status IN ('reported','accepted','investigating','controlled','closed')),
@@ -201,7 +203,7 @@ CREATE TABLE case_report (
   patient_type text CHECK (patient_type IN ('OPD','IPD')),
   symptom      text,
   lab_result   jsonb NOT NULL DEFAULT '{}'::jsonb,
-  detail       jsonb NOT NULL DEFAULT '{}'::jsonb,   -- ฟิลด์เฉพาะโรค ตาม c_disease.code
+  detail       jsonb NOT NULL DEFAULT '{}'::jsonb,   -- ฟิลด์เฉพาะโรค ตาม c_disease506.code
 
   -- ผู้แจ้ง (หน่วยงานที่แจ้ง บังคับ)
   report_org_code   text NOT NULL REFERENCES c_org,
@@ -262,8 +264,10 @@ CREATE UNIQUE INDEX case_accept_one_active ON case_acceptance (case_id) WHERE st
 --    หน่วยที่กดรับคือหน่วยที่รับผิดชอบต่อ (hos_village ใช้จัดลำดับ inbox เท่านั้น)
 -- 2) sync case_report.status ให้เอง ทุก action จึงเขียนตารางเดียว ไม่มีทางลืมอัปเดตสถานะ
 CREATE FUNCTION case_acceptance_sync() RETURNS trigger LANGUAGE plpgsql AS $fn$
+-- ตั้งชื่อ v_case_id ไม่ใช่ cid เพราะ case_report มีคอลัมน์ cid (เลขบัตร) แล้วจะกำกวม
+DECLARE v_case_id bigint := coalesce(NEW.case_id, OLD.case_id);   -- DELETE ไม่มี NEW
 BEGIN
-  IF NEW.status = 'active' AND NEW.transferred_from IS NULL AND NOT EXISTS (
+  IF TG_OP <> 'DELETE' AND NEW.status = 'active' AND NEW.transferred_from IS NULL AND NOT EXISTS (
        SELECT 1 FROM users u
         WHERE u.id = NEW.accepted_by AND u.role IN ('province','hospital')
   ) THEN
@@ -273,14 +277,17 @@ BEGIN
 
   UPDATE case_report c
      SET status = CASE WHEN EXISTS (SELECT 1 FROM case_acceptance a
-                                     WHERE a.case_id = NEW.case_id AND a.status = 'active')
+                                     WHERE a.case_id = v_case_id AND a.status = 'active')
                        THEN 'accepted' ELSE 'reported' END
-   WHERE c.id = NEW.case_id
+   WHERE c.id = v_case_id
      AND c.status IN ('reported','accepted');   -- ไม่ไปแตะเคสที่เดินหน้าไปแล้ว
   RETURN NULL;
 END $fn$;
 
-CREATE TRIGGER t_case_acceptance AFTER INSERT OR UPDATE ON case_acceptance
+-- รวม DELETE ด้วย: status ของเคสต้องเป็นผลของ case_acceptance เสมอ ไม่ว่าใครเขียน
+-- (แอปใช้ status='released' ไม่เคยลบ แต่สคริปต์แก้ข้อมูล/คนนั่ง psql ลบได้ แล้วเคสจะค้าง
+--  สถานะ accepted ทั้งที่ไม่มีใครถือ — หายทั้งจากรายการรอรับและทะเบียนรับแบบเงียบ ๆ)
+CREATE TRIGGER t_case_acceptance AFTER INSERT OR UPDATE OR DELETE ON case_acceptance
   FOR EACH ROW EXECUTE FUNCTION case_acceptance_sync();
 
 -- admin/สสจ. โยกเคสให้ผู้ใช้อีกคน: ปิดแถวเดิม + เปิดแถวใหม่ ในทรานแซกชันเดียว
@@ -430,7 +437,7 @@ SELECT
      <= th_ts(c.date_report, c.time_report)
         + make_interval(hours => d.investigate_within_hours)) AS investigated_in_time
 FROM case_report c
-JOIN c_disease d ON d.code = c.disease_code
+JOIN c_disease506 d ON d.code = c.disease_code
 LEFT JOIN case_acceptance a ON a.case_id = c.id AND a.status = 'active'
 WHERE c.deleted_at IS NULL;
 
@@ -501,6 +508,62 @@ LEFT JOIN LATERAL (
   WHERE x.activity_id = ev.activity_id
 ) f ON ev.activity_id IS NOT NULL;
 
+-- เส้นทางของเคส: แจ้ง -> รับ -> คืน -> รับใหม่ -> ... เรียงตามเวลาจริง
+-- เป็น view ไม่ใช่ตาราง เพราะทุกเหตุการณ์ถอดจาก case_report + case_acceptance ได้ครบอยู่แล้ว
+-- (ตารางจริงต้องมี trigger คอยเขียนตาม แล้วมีโอกาสไม่ตรงกับของจริง — อันนี้ผิดไม่ได้เลย)
+CREATE VIEW case_journey_log AS
+WITH ev AS (
+  -- แจ้งเคสเข้าระบบ
+  -- ไม่กรอง deleted_at: เคสที่ถูกจำหน่ายแล้วก็ยังต้องตรวจสอบย้อนหลังได้
+  SELECT c.id AS case_id, th_ts(c.date_report, c.time_report) AS at, 0 AS rank,
+         'REPORT' AS event, c.report_org_code AS org_code, c.created_by AS user_id,
+         NULL::text AS note
+  FROM case_report c
+
+  UNION ALL
+  -- จำหน่ายออกจากระบบ (soft delete โดย สสจ.)
+  SELECT c.id, c.deleted_at, 3, 'DISCHARGE', u.org_code, c.deleted_by, c.delete_reason
+  FROM case_report c
+  LEFT JOIN users u ON u.id = c.deleted_by
+  WHERE c.deleted_at IS NOT NULL
+
+  UNION ALL
+  -- รับเคส — ทุกครั้งที่รับ ไม่ใช่แค่ครั้งแรก
+  SELECT a.case_id, th_ts(a.date_accept, a.time_accept), 1,
+         CASE WHEN a.transferred_from IS NOT NULL THEN 'TRANSFER_IN' ELSE 'ACCEPT' END,
+         a.org_code, a.accepted_by, NULL
+  FROM case_acceptance a
+
+  UNION ALL
+  -- คืนเคส / ถูกโยกออก
+  SELECT a.case_id, a.released_at, 2,
+         CASE a.status WHEN 'released' THEN 'RELEASE' ELSE 'TRANSFER_OUT' END,
+         a.org_code, a.released_by, a.note
+  FROM case_acceptance a
+  WHERE a.released_at IS NOT NULL
+)
+SELECT
+  ev.case_id,
+  row_number() OVER (PARTITION BY ev.case_id ORDER BY ev.at, ev.rank)::int AS seq,
+  ev.at,                                            -- instant ของเหตุการณ์ (เวลาไทย)
+  ev.event,
+  CASE ev.event
+    WHEN 'REPORT'       THEN 'แจ้งเคสเข้าระบบ'
+    WHEN 'ACCEPT'       THEN 'พื้นที่รับเคส'
+    WHEN 'RELEASE'      THEN 'คืนเคส'
+    WHEN 'TRANSFER_IN'  THEN 'รับเคสที่โยกมา'
+    WHEN 'TRANSFER_OUT' THEN 'โยกเคสให้หน่วยอื่น'
+    WHEN 'DISCHARGE'    THEN 'จำหน่ายออกจากระบบ'
+  END AS event_name,
+  ev.org_code,
+  o.name AS org_name,                               -- หน่วยงานที่ทำ
+  ev.user_id,
+  u.full_name AS user_name,                         -- ผู้ทำ
+  ev.note                                           -- เหตุผลตอนคืน/โยก
+FROM ev
+LEFT JOIN c_org o ON o.code = ev.org_code
+LEFT JOIN users u ON u.id   = ev.user_id;
+
 -- หน้าแรก: รายการเคสที่ถูกรายงานเข้าระบบ (เรียงลำดับล่าสุดก่อน)
 -- ลำดับ | โรงพยาบาล | วันเวลาพบ | วันเวลารายงาน | ชื่อ-สกุล | อำเภอ | ตำบล | หมู่ที่ | วินิจฉัย | วันเวลารับเคส | รับเคสโดย
 -- อำเภอ/ตำบล ตัดจาก prefix ของ area_code ไม่ต้องไล่ parent ทีละชั้น
@@ -542,7 +605,7 @@ SELECT
   c.status,
   c.area_code
 FROM case_report c
-JOIN c_disease d ON d.code = c.disease_code
+JOIN c_disease506 d ON d.code = c.disease_code
 LEFT JOIN c_org      ro  ON ro.code  = c.report_org_code
 LEFT JOIN c_area tmb ON tmb.code = left(c.area_code, 6)
 LEFT JOIN c_area amp ON amp.code = left(c.area_code, 4)
@@ -564,7 +627,7 @@ SELECT
   (th_ts(c.date_report, c.time_report)
      + make_interval(hours => d.investigate_within_hours)) AS investigate_due_at
 FROM case_report c
-JOIN c_disease  d  ON d.code = c.disease_code
+JOIN c_disease506 d ON d.code = c.disease_code
 JOIN hos_village oa ON oa.area_code = c.area_code           -- "อยู่พื้นที่ตัวเอง"
 WHERE c.deleted_at IS NULL
   AND NOT EXISTS (SELECT 1 FROM case_acceptance a WHERE a.case_id = c.id AND a.status = 'active');
@@ -576,7 +639,7 @@ LANGUAGE sql STABLE AS $fn$
   SELECT n.id, n.case_no, n.date_onset,
          ST_Distance(c.geom::geography, n.geom::geography)
   FROM case_report c
-  JOIN c_disease d ON d.code = c.disease_code
+  JOIN c_disease506 d ON d.code = c.disease_code
   JOIN case_report n
     ON n.id <> c.id
    AND n.disease_code = c.disease_code
@@ -592,21 +655,13 @@ $fn$;
 
 -- icd10 เขียนแบบไม่มีจุด ให้ตรงกับที่ HOSxP เก็บใน icd101.code และ ovstdiag.icd10 (เช่น A910)
 -- A910 = DHF with shock จึงเป็นของ DSS ตัวเดียว ส่วน 26 ได้ A911/A919 กับ A91 ที่ไม่ระบุ
-INSERT INTO c_disease (code,name_th,name_en,icd10,disease_group,transmission,investigate_within_hours,control_radius_m,incubation_min_days,incubation_max_days) VALUES
- ('66','ไข้เดงกี','Dengue fever','{A90}','ไข้เลือดออก','vector',24,100,3,14),
- ('26','ไข้เลือดออก','Dengue hemorrhagic fever','{A91,A911,A919}','ไข้เลือดออก','vector',24,100,3,14),
- ('27','ไข้เลือดออกช็อก','Dengue shock syndrome','{A910}','ไข้เลือดออก','vector',24,100,3,14),
- ('87','ชิคุนกุนยา','Chikungunya','{A920}','ไข้เลือดออก','vector',24,100,3,12),
- -- A925 ยังไม่มีใน icd101 ของ HOSxP รุ่นนี้ ใส่ไว้เผื่ออัปเดตชุดรหัส
- ('84','ไวรัสซิกา','Zika virus','{A925}','ไข้เลือดออก','vector',24,100,3,14)
-ON CONFLICT DO NOTHING;
-
-INSERT INTO c_disease506 (code,name_en,name_th,icd10,must_report) VALUES
- ('26','Dengue hemorrhagic fever (DHF)','ไข้เลือดออก','{A91,A911,A919}',true),
- ('27','Dengue shock syndrome (DSS)','ไข้เลือดออกช็อก','{A910}',true),
- ('66','Dengue fever (DF)','ไข้เดงกี','{A90}',true),
- ('84','Zika virus','ไวรัสซิกา','{A925}',true),
- ('87','Chikungunya','ชิคุนกุนยา','{A920}',true)
+-- A925 (Zika) ยังไม่มีใน icd101 ของ HOSxP รุ่นเก่า ใส่ไว้เผื่ออัปเดตชุดรหัส
+INSERT INTO c_disease506 (code,name_th,name_en,icd10,must_report,disease_group,transmission,investigate_within_hours,control_radius_m,incubation_min_days,incubation_max_days) VALUES
+ ('26','ไข้เลือดออก','Dengue hemorrhagic fever (DHF)','{A91,A911,A919}',true,'ไข้เลือดออก','vector',24,100,3,14),
+ ('27','ไข้เลือดออกช็อก','Dengue shock syndrome (DSS)','{A910}',true,'ไข้เลือดออก','vector',24,100,3,14),
+ ('66','ไข้เดงกี','Dengue fever (DF)','{A90}',true,'ไข้เลือดออก','vector',24,100,3,14),
+ ('84','ไวรัสซิกา','Zika virus','{A925}',true,'ไข้เลือดออก','vector',24,100,3,14),
+ ('87','ชิคุนกุนยา','Chikungunya','{A920}',true,'ไข้เลือดออก','vector',24,100,3,12)
 ON CONFLICT DO NOTHING;
 
 -- REPORT/ACCEPT เป็นลำดับ 1/2 ที่ v_case_activity สร้างเอง มีไว้ให้รหัสครบเท่านั้น

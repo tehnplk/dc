@@ -2,6 +2,7 @@ import { fmtDate as d } from '@/lib/datetime'
 import { ActivityModal } from './ActivityModal'
 import { AcceptButton } from './AcceptButton'
 import { Pagination } from './Pagination'
+import { DischargeButton } from './DischargeButton'
 import { ReleaseButton } from './ReleaseButton'
 // ชนิดของแถวในวิว: prisma ตั้งชื่อว่า <model>Model ไม่ใช่ชื่อวิวเปล่า ๆ
 import type { v_case_listModel as v_case_list } from '@/generated/prisma/models/v_case_list'
@@ -26,14 +27,17 @@ function DateTime({ date, time }: { date: Date | null; time: string | null }) {
 // from = คอลัมน์ "จาก" ทะเบียนแจ้งไม่ต้องมี เพราะเป็นหน่วยงานตัวเองทุกแถวอยู่แล้ว
 // canAdd = หน้านั้นให้บันทึกกิจกรรมได้ (ทะเบียนรับ) ไม่ส่ง = ดูได้อย่างเดียว
 export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd, canEdit, addAmp,
-                            canAccept = true, canRelease, performer = null, page, total }:
+                            canAccept = true, canRelease, dischargeOrg, performer = null, page, total }:
   { cases: v_case_list[]; empty: string; from?: boolean; unit?: boolean; addr?: boolean
     canAdd?: boolean
     /** แก้/ลบกิจกรรมได้ (ทะเบียนรับของหน่วยบริการ — เคสในนี้คือเคสที่ตัวเองรับไว้) */
     canEdit?: boolean
     /** จำกัดปุ่มเพิ่มกิจกรรมไว้เฉพาะเคสที่รหัสพื้นที่ขึ้นต้นด้วยค่านี้ (ใช้กับ role district) */
     addAmp?: string | null
-    canAccept?: boolean; canRelease?: boolean; performer?: string | null
+    canAccept?: boolean; canRelease?: boolean
+    /** รหัสหน่วยงานของ สสจ. — ปุ่มจำหน่ายโผล่เฉพาะเคสที่หน่วยนี้รับไว้เอง */
+    dischargeOrg?: string | null
+    performer?: string | null
     page?: number; total?: number }) {
   return (
     <>
@@ -56,13 +60,13 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
             <th className={th}>รับ</th>
             {unit && <th className={th}>หน่วยรับ</th>}
             <th className={`${th} text-center`}>กิจกรรม</th>
-            {canRelease && <th className={`${th} text-center`}>Action</th>}
+            {(canRelease || dischargeOrg) && <th className={`${th} text-center`}>Action</th>}
           </tr>
         </thead>
         <tbody>
           {cases.length === 0 && (
             <tr>
-              <td colSpan={10 + (from ? 1 : 0) + (unit ? 1 : 0) + (addr ? 1 : 0) + (canRelease ? 1 : 0)} className="px-3 py-10 text-center text-fg-muted">{empty}</td>
+              <td colSpan={10 + (from ? 1 : 0) + (unit ? 1 : 0) + (addr ? 1 : 0) + (canRelease || dischargeOrg ? 1 : 0)} className="px-3 py-10 text-center text-fg-muted">{empty}</td>
             </tr>
           )}
           {/* แถบสลับสี: อ่านข้ามคอลัมน์ไม่หลุดบรรทัด — hover ใช้คนละสีจะได้ไม่จมไปกับแถบ */}
@@ -126,14 +130,18 @@ export function CaseTable({ cases, empty, from = true, unit = true, addr, canAdd
                   </div>
                 )}
               </td>
-              {canRelease && (
+              {(canRelease || dischargeOrg) && (
                 <td className={`${td} text-center`}>
-                  {/* คืนได้เฉพาะเคสที่ยังถืออยู่ */}
-                  {c.date_accept && (
-                    <div className="flex justify-center">
+                  <div className="flex justify-center gap-1">
+                    {/* คืนได้เฉพาะเคสที่ยังถืออยู่ */}
+                    {canRelease && c.date_accept && (
                       <ReleaseButton caseId={String(c.id)} caseNo={c.case_no} patient={c.patient_name} />
-                    </div>
-                  )}
+                    )}
+                    {/* จำหน่ายได้เฉพาะเคสที่ สสจ. รับไว้เอง — ต้องรับก่อนถึงจะจำหน่ายได้ */}
+                    {dischargeOrg && c.accepted_org_code === dischargeOrg && (
+                      <DischargeButton caseId={String(c.id)} caseNo={c.case_no} patient={c.patient_name} />
+                    )}
+                  </div>
                 </td>
               )}
             </tr>

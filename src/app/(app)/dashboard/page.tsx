@@ -31,7 +31,7 @@ export default async function Page({ searchParams }: PageProps<'/dashboard'>) {
              (a.id IS NOT NULL) AS accepted,
              ST_Y(c.geom) AS lat, ST_X(c.geom) AS lon
       FROM case_report c
-      JOIN c_disease d ON d.code = c.disease_code
+      JOIN c_disease506 d ON d.code = c.disease_code
       LEFT JOIN c_area tmb ON tmb.code = left(c.area_code, 6)
       LEFT JOIN c_area amp ON amp.code = left(c.area_code, 4)
       LEFT JOIN case_acceptance a ON a.case_id = c.id AND a.status = 'active'
@@ -86,7 +86,7 @@ export default async function Page({ searchParams }: PageProps<'/dashboard'>) {
 
     prisma.$queryRaw<Row[]>`
       SELECT d.name_th AS label, count(c.id) AS cases, NULL::bigint AS extra
-      FROM c_disease d
+      FROM c_disease506 d
       JOIN case_report c ON c.disease_code = d.code AND c.deleted_at IS NULL
       GROUP BY 1 ORDER BY 2 DESC`,
 

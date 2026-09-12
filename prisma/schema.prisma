@@ -147,7 +147,7 @@ model case_report {
   adm_area          c_area?                  @relation(fields: [area_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   created_by_user   users?                   @relation("case_report_created_byTousers", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
   deleted_by_user   users?                   @relation("case_report_deleted_byTousers", fields: [deleted_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  disease           c_disease                @relation(fields: [disease_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  disease           c_disease506             @relation(fields: [disease_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   occupation        c_occupation?            @relation(fields: [occupation_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   org               c_org                    @relation(fields: [report_org_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   updated_by_user   users?                   @relation("case_report_updated_byTousers", fields: [updated_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -211,22 +211,6 @@ model c_area {
   @@index([parent_code], map: "c_area_parent_idx")
 }
 
-model c_disease {
-  code                     String            @id
-  name_th                  String
-  name_en                  String?
-  icd10                    String[]
-  disease_group            String?
-  transmission             String?
-  investigate_within_hours Int?
-  control_radius_m         Int?
-  incubation_min_days      Int?
-  incubation_max_days      Int?
-  is_active                Boolean           @default(true)
-  c_form_template          c_form_template[]
-  case_report              case_report[]
-}
-
 model c_form_template {
   id            BigInt          @id @default(autoincrement())
   code          String
@@ -235,7 +219,7 @@ model c_form_template {
   disease_code  String?
   schema        Json
   is_active     Boolean         @default(true)
-  c_disease     c_disease?      @relation(fields: [disease_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  c_disease     c_disease506?   @relation(fields: [disease_code], references: [code], onDelete: NoAction, onUpdate: NoAction)
   case_document case_document[]
 
   @@unique([code, version])
@@ -324,13 +308,22 @@ model users {
 }
 
 model c_disease506 {
-  code           String         @id
-  name_en        String?
-  name_th        String
-  icd10          String[]
-  must_report    Boolean        @default(false)
-  report_form_id BigInt?
-  c_report_form  c_report_form? @relation(fields: [report_form_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  code                     String            @id
+  name_en                  String?
+  name_th                  String
+  icd10                    String[]
+  must_report              Boolean           @default(false)
+  report_form_id           BigInt?
+  disease_group            String?
+  transmission             String?
+  investigate_within_hours Int?
+  control_radius_m         Int?
+  incubation_min_days      Int?
+  incubation_max_days      Int?
+  is_active                Boolean           @default(true)
+  c_report_form            c_report_form?    @relation(fields: [report_form_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  c_form_template          c_form_template[]
+  case_report              case_report[]
 }
 
 model c_report_form {
@@ -338,6 +331,15 @@ model c_report_form {
   code         String         @unique
   name         String
   c_disease506 c_disease506[]
+}
+
+model c_icd10 {
+  code  String  @id
+  name  String?
+  tname String?
+  code3 String?
+
+  @@index([code3])
 }
 
 view geography_columns {
@@ -454,6 +456,19 @@ view v_case_list {
   accepted_by_name  String?
   status            String?
   area_code         String?
+}
+
+view case_journey_log {
+  case_id    BigInt?
+  seq        Int?
+  at         DateTime? @db.Timestamptz(6)
+  event      String?
+  event_name String?
+  org_code   String?
+  org_name   String?
+  user_id    BigInt?
+  user_name  String?
+  note       String?
 }
 
 /// materialized view — prisma db pull มองไม่เห็น postpull.mjs เติมกลับให้

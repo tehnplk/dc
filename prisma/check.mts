@@ -5,7 +5,7 @@ import { prisma } from '../src/lib/db'
 
 const eq = (a: unknown, b: unknown, m: string) => assert.deepEqual(a, b, m)
 
-const df = await prisma.c_disease.findUniqueOrThrow({ where: { code: '66' } })
+const df = await prisma.c_disease506.findUniqueOrThrow({ where: { code: '66' } })
 eq(df.icd10, ['A90'], 'text[] ต้อง map เป็น string[]')
 eq(df.control_radius_m, 100, 'ค่าปรับรายโรคต้องอ่านได้')
 

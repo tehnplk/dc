@@ -132,6 +132,9 @@ export async function releaseCase(_prev: ReleaseState, fd: FormData): Promise<Re
   if (typeof caseId !== 'string' || !/^\d{1,18}$/.test(caseId)) return { error: 'เคสไม่ถูกต้อง' }
 
   const me = await currentUser()
+  // คืนได้เฉพาะบทบาทที่รับได้ — สสอ. บันทึกกิจกรรมอย่างเดียว ไม่ได้ถือเคส
+  if (!me.canCase) return { error: 'บทบาทของคุณคืนเคสไม่ได้' }
+
   const note = str(fd, 'note')
   if (note && note.length > 255) return { error: 'เหตุผลยาวเกิน 255 ตัวอักษร' }
 
@@ -195,5 +198,44 @@ export async function deleteActivity(_prev: ActivityState, fd: FormData): Promis
   await prisma.case_activity.delete({ where: { id: guard.act.id } })
 
   revalidatePath('/accept')
+  return { ok: String(Date.now()) }
+}
+
+export type DischargeState = { error?: string; ok?: string }
+
+/**
+ * จำหน่ายเคสออกจากระบบ (soft delete) — เคสแจ้งซ้ำ/แจ้งผิดคน/ไม่ใช่เคสจริง
+ * สสจ. เท่านั้น เพราะเป็นการเอาเคสออกจากทุกทะเบียนและทุกรายงาน ย้อนกลับได้แต่ต้องแก้ DB เอง
+ * ไม่ลบแถวจริง ประวัติการรับ/คืน/กิจกรรมยังอยู่ครบ ตรวจสอบย้อนหลังได้
+ */
+export async function dischargeCase(_prev: DischargeState, fd: FormData): Promise<DischargeState> {
+  const caseId = fd.get('caseId')
+  if (typeof caseId !== 'string' || !/^\d{1,18}$/.test(caseId)) return { error: 'เคสไม่ถูกต้อง' }
+
+  const me = await currentUser()
+  if (me.role !== 'province') return { error: 'เฉพาะ สสจ. เท่านั้นที่จำหน่ายเคสได้' }
+
+  // ต้องรับเคสไว้เองก่อน — กันจำหน่ายเคสที่หน่วยอื่นกำลังทำงานอยู่
+  if (!(await prisma.case_acceptance.findFirst({
+        where: { case_id: BigInt(caseId), status: 'active', org_code: me.org_code },
+        select: { id: true },
+      })))
+    return { error: 'ต้องรับเคสนี้ไว้ก่อนจึงจะจำหน่ายได้' }
+
+  // บังคับเหตุผล — เคสหายไปจากทุกรายงาน คนที่มาดูทีหลังต้องรู้ว่าทำไม
+  const reason = str(fd, 'reason')
+  if (!reason) return { error: 'ระบุเหตุผลที่จำหน่ายเคส' }
+  if (reason.length > 255) return { error: 'เหตุผลยาวเกิน 255 ตัวอักษร' }
+
+  const { count } = await prisma.case_report.updateMany({
+    where: { id: BigInt(caseId), deleted_at: null },
+    data: { deleted_at: new Date(), deleted_by: me.id, delete_reason: reason },
+  })
+  if (count === 0) return { error: 'ไม่พบเคสนี้ หรือถูกจำหน่ายไปแล้ว' }
+
+  revalidatePath('/report')
+  revalidatePath('/accept')
+  revalidatePath('/patients')
+  revalidatePath('/dashboard')
   return { ok: String(Date.now()) }
 }

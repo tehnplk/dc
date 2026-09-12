@@ -60,7 +60,8 @@ export default async function Page({ searchParams }: PageProps<'/accept'>) {
         addr
         canAdd
         canEdit={me.role === 'hospital'}
-        canRelease
+        canRelease={me.canCase}
+        dischargeOrg={me.role === 'province' ? me.org_code : null}
         canAccept={false}
         performer={me.full_name}
         page={page}

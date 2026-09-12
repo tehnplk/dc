@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  agentRules: false,
   reactCompiler: true,
   // badge ของ dev อยู่มุมซ้ายล่างทับปุ่มธีมท้าย sidebar กดไม่ได้
   devIndicators: { position: "bottom-right" },
